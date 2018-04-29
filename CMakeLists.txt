@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(Scotty3D)
+project(Scotty3D LANGUAGES CXX C CUDA)
 
 #-------------------------------------------------------------------------------
 # Build options
@@ -71,7 +71,8 @@ if(LINUX)
   if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 
     set(GCC_CXX_FLAGS "-std=gnu++11 -m64")
-
+    set(CMAKE_CUDA_FLAGS "-std=c++11")
+    
     # X11 Dependencies
     if(NOT BUILD_LIBCMU462)
       set(GCC_CXX_FLAGS "${GCC_CXX_FLAGS} -lXi")

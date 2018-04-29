@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/sassy/cs618/project/cudascotty/src/getopt.c
+getopt.h
+/home/sassy/cs618/project/cudascotty/src/getopt.h
+string.h
+-
+stdio.h
+-
+
+/home/sassy/cs618/project/cudascotty/src/getopt.h
+

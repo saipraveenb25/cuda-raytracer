@@ -71,7 +71,17 @@ class Triangle : public Primitive {
    * Draw outline with OpenGL (for visualizer)
    */
   void drawOutline(const Color& c) const;
+    
 
+  /**
+   * Positions
+   */
+   void positions(Vector3D &v0, Vector3D &v1, Vector3D &v2);
+  
+  /**
+   * Normals
+   */
+   void normals(Vector3D &n0, Vector3D &n1, Vector3D &n2);
  private:
   const Mesh* mesh;  ///< pointer to the mesh the triangle is a part of
 

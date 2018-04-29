@@ -87,7 +87,6 @@ class AreaLight : public SceneLight {
                     float* pdf) const;
   bool is_delta_light() const { return false; }
 
- private:
   Spectrum radiance;
   Vector3D position;
   Vector3D direction;

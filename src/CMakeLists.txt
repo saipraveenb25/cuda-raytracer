@@ -49,7 +49,65 @@ set(APPLICATION_SOURCE
     # Application
     application.cpp
     main.cpp
+
 )
+
+# Cuda renderer source
+set(CUDA_SOURCE
+
+    # Collada Parser
+    collada/collada.cpp
+    collada/camera_info.cpp
+    collada/light_info.cpp
+    collada/sphere_info.cpp
+    collada/polymesh_info.cpp
+    collada/material_info.cpp
+    
+    # Dynamic Scene
+    dynamic_scene/mesh.cpp
+    dynamic_scene/scene.cpp
+    dynamic_scene/sphere.cpp
+    dynamic_scene/widgets.cpp
+    dynamic_scene/skeleton.cpp
+    dynamic_scene/joint.cpp
+
+
+    # Static scene
+    static_scene/sphere.cpp
+    static_scene/triangle.cpp
+    static_scene/object.cpp
+    static_scene/environment_light.cpp
+    static_scene/light.cpp
+
+    # MeshEdit
+    halfEdgeMesh.cpp
+    meshEdit.cpp
+
+    # PathTracer
+    bvh.cpp
+    bbox.cpp
+    bsdf.cpp
+    camera.cpp
+    sampler.cpp
+    pathtracer.cpp
+
+    # Animator
+    timeline.cpp
+
+    # misc
+    misc/sphere_drawing.cpp
+    getopt.c
+    error_dialog.cpp
+
+    # Application
+    application.cpp
+    main.cpp
+    
+    # Cuda Renderer
+    cudaRenderer.cu
+
+)
+
 
 #-------------------------------------------------------------------------------
 # Set include directories
@@ -75,8 +133,18 @@ link_directories(
 # Add executable
 #-------------------------------------------------------------------------------
 add_executable(scotty3d ${APPLICATION_SOURCE})
+add_executable(scottyCuda ${CUDA_SOURCE})
 
 target_link_libraries( scotty3d
+    CMU462 ${CMU462_LIBRARIES}
+    glew ${GLEW_LIBRARIES}
+    glfw ${GLFW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${FREETYPE_LIBRARIES}
+    ${CMAKE_THREADS_INIT}
+)
+
+target_link_libraries( scottyCuda
     CMU462 ${CMU462_LIBRARIES}
     glew ${GLEW_LIBRARIES}
     glfw ${GLFW_LIBRARIES}

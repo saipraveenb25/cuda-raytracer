@@ -4,6 +4,7 @@
 #include "scene.h"
 #include "../image.h"
 #include "../static_scene/light.h"
+#include "../static_scene/environment_light.h"
 
 namespace CMU462 {
 namespace DynamicScene {
