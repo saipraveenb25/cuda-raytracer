@@ -1,0 +1,47 @@
+#include <stdio.h>
+#include <curand.h>
+#include <curand_kernel.h>
+#include <math.h>
+#include <assert.h>
+#define ARR_LEN 20
+#define PI 3.14159
+#define seed 15618
+
+__global__ void setup_kernel(curandState *state){
+	
+	int idx = threadIdx.x+blockDim.x*blockIdx.x;
+	curand_init(seed, idx, 0, &state[idx]);
+}
+
+__global__ void generate_ray(curandState *my_curandstate, float *t, float *p){
+
+	int idx = threadIdx.x + blockDim.x*blockIdx.x;
+	float rand1 = curand_uniform( my_curandstate + idx);
+	float rand2 = curand_uniform( my_curandstate + idx);
+	float theta = (2 * PI * rand1);
+	float phi = acosf((2 * rand2) - 1);
+	t[idx] = theta;
+	p[idx] = phi;
+	float3 ray = make_float3(sinf(theta), sinf(theta) * cosf(phi), cosf(phi));
+}
+
+int main(){
+	curandState *d_state;
+	cudaMalloc(&d_state, sizeof(curandState));
+	float *theta_array, *host_t_array, *phi_array, *host_p_array;
+	host_t_array = ((float *) malloc(ARR_LEN * sizeof(float)));
+	host_p_array = ((float *) malloc(ARR_LEN * sizeof(float)));
+	cudaMalloc(&theta_array, (ARR_LEN) * sizeof(float));
+	cudaMalloc(&phi_array, (ARR_LEN) * sizeof(float));
+	cudaMemset(theta_array, 0, (ARR_LEN)*sizeof(float));
+	cudaMemset(phi_array, 0, (ARR_LEN)*sizeof(float));
+	setup_kernel<<<1, ARR_LEN>>>(d_state);
+
+  	generate_ray<<<1, ARR_LEN>>>(d_state, theta_array, phi_array);
+  	cudaMemcpy(host_t_array, theta_array, (ARR_LEN) * sizeof(float), cudaMemcpyDeviceToHost);
+  	cudaMemcpy(host_p_array, phi_array, (ARR_LEN) * sizeof(float), cudaMemcpyDeviceToHost);
+  	printf("Index:\tTheta:\tPhi\n");
+  	for (int i = 0; i < ARR_LEN; i++)
+    		printf("%d\t%f\t%f\n", i+1, host_t_array[i], host_p_array[i]);
+	return 0;
+}
