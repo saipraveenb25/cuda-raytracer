@@ -42,20 +42,24 @@
 #include "dynamic_scene/skeleton.h"
 #include "dynamic_scene/joint.h"
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <driver_functions.h>
+
 
 #include "cuda_image.h"
 #include "bvh.h"
 
 #define TREE_WIDTH 8
 #define RAYS_PER_BLOCK 128
-#define RAYS_PER_BLOCK_LOG2 8
+#define RAYS_PER_BLOCK_LOG2 7
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 10
-#define SAMPLES_PER_PIXEL 16
+#define SAMPLES_PER_PIXEL 4
 #define MAX_TRIANGLES 128
 #define MAX_T_DISTANCE 10000.0
-
+#define MAX_INTERSECTIONS 4
 
 namespace cutracer {
 struct CuRay {
@@ -67,6 +71,13 @@ struct CuRay {
     float2 ss;  // Screen Space coordinates for update.
     float maxT; // Maximum length.
     int sid; // Sample ID.
+    int id; // Ray ID.
+
+    // Copied from CuIntersection. 
+    // To allow easy direct light estimation.
+    float3 n;
+    float t;
+    float3 wi;
 };
 
 struct CuTriangle {
@@ -98,8 +109,7 @@ struct CuBSDF{
     float nu;       // For specular.
 };
 
-struct CuBVHSubTree {
-    
+struct CuBVHSubTree { 
     uint64_t outlets[TREE_WIDTH];
     
     uint64_t start;
@@ -119,6 +129,9 @@ struct CuIntersection {
     float2 ss;
     int sid;
     int bsdf;
+    int id;
+    int is_new; // Waiting for the next overwrite.
+    bool valid;
 }; 
 
 class CudaRenderer {
@@ -138,6 +151,10 @@ private:
     int* deviceLevelIndices;
     float* deviceImageData;
     float* deviceSSImageData;
+    uint* deviceQueueCounts;
+    float* deviceMinT;
+    uint* deviceIntersectionTokens;
+    CuIntersection* deviceMultiIntersections;
 
     // Host structures.
     std::vector<CuBSDF> bsdfs;
@@ -145,6 +162,14 @@ private:
     std::vector<CuTriangle> triangles;
     std::vector<CuBVHSubTree> subtrees;
     int* levelIndices;
+    std::vector<int> levelCounts;
+    
+    
+    // Camera data.
+    Vector3D c_origin;
+    Vector3D c_lookAt;
+    Vector3D c_up;
+    Vector3D c_left;
 
 public:
 
@@ -160,6 +185,8 @@ public:
     void allocOutputImage(int width, int height);
 
     void clearImage();
+    
+    void clearIntersections();
 
     void advanceAnimation();
 

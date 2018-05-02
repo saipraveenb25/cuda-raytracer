@@ -231,44 +231,52 @@ namespace CMU462 {
 
 
 
-            int BVHSubTree::compress(std::vector<C_BVHSubTree>& tree, int* levelLists, int levelStride, std::vector<int>& levelCounts, int depth, int max_depth) {
+            int BVHSubTree::compress(std::vector<C_BVHSubTree> *tree, int* levelLists, int levelStride, std::vector<int> *levelCounts, int depth, int max_depth) {
 
-             C_BVHSubTree _ctree;
+                C_BVHSubTree _ctree;
+                
+                //std::cout << "Compressing: " << this->start << "-" << this->start + this->range << "=" << tree->size() << std::endl;
+                
+                int idx = tree->size();
+                tree->push_back(_ctree);
 
-             int idx = tree.size();
-             tree.push_back(_ctree);
+                //C_BVHSubTree *ctree = &tree->at(idx);
+                
+                if(levelCounts->size() <= depth)
+                    levelCounts->push_back(0); 
+                
+                //printf("Setting levellist %d, %d, %d -> %d\n", depth, levelStride, levelCounts->at(depth), idx);
+                levelLists[depth * levelStride + (levelCounts->at(depth)++)] = idx;
 
-             C_BVHSubTree *ctree = &tree[idx];
+                //int old_offset = offset;
+                //offset += sizeof(C_BVHSubTree);
+                tree->at(idx).range = this->range;
+                tree->at(idx).start = this->start;
+                if(depth > max_depth) {
+                    printf("Depth exceeds max depth\n");
+                    exit(0);
+                }
 
-             levelLists[depth * levelStride + (levelCounts[depth]++)] = idx;
+                for(int i = 0; i < TREE_BRANCHES; i++) {
+                    if(this->outlets[i] != NULL) {
+                        int offset = this->outlets[i]->compress(tree, levelLists, levelStride, levelCounts, depth+1, max_depth);
+                        tree->at(idx).outlets[i] = offset;
+                        tree->at(idx).min[i] = this->min[i];
+                        tree->at(idx).max[i] = this->max[i];
+                    } else {
+                        tree->at(idx).outlets[i] = (uint64_t)-1;
+                    }
 
-             //int old_offset = offset;
-             //offset += sizeof(C_BVHSubTree);
-             ctree->range = this->range;
-             ctree->start = this->start;
-             if(depth > max_depth) {
-             printf("Depth exceeds max depth\n");
-             exit(0);
-             }
+                }
 
-             for(int i = 0; i < TREE_BRANCHES; i++) {
-                 if(this->outlets[i] != 0) {
-                     int offset = this->outlets[i]->compress(tree, levelLists, levelStride, levelCounts, depth+1, max_depth);
-                     ctree->outlets[i] = offset;
-                 } else {
-                     ctree->outlets[i] = (uint64_t)-1;
-                 }
-
-             }
-
-             return idx;
+                return idx;
             }
 
             BVHSubTree* BVHNode::compactTree() {
-
+                //std::cout << "Compacting: " << this->start << "-" << this->start + this->range << std::endl;
                 // Do an iterative depth-first search.
                 bool done = false;
-                std::stack<std::pair<int,BVHNode*> > st;
+                std::stack<std::pair<int,BVHNode*> > *st = new std::stack<std::pair<int, BVHNode*> >();
 
                 BVHSubTree* subtree = new BVHSubTree();
 
@@ -283,34 +291,47 @@ namespace CMU462 {
                 }
 
                 int curr = 0;
-                st.push(std::make_pair(0,this));
-                while(st.size() != 0) {
-                    std::pair<int,BVHNode*> dn = st.top();
-                    st.pop();
+                st->push(std::make_pair(0,this));
+                while(st->size() != 0) {
+                    std::pair<int,BVHNode*> dn = st->top();
+                    st->pop();
 
                     int depth = dn.first;
                     BVHNode* n = dn.second;
-                    if(depth == DEPTH - 1) {
+                    if(depth == DEPTH) {
+                        //std::cout << "Compacting[" << curr << "]: " << this->start << "-" << this->start + this->range << "=" << n->start << "-" << n->start + n->range << std::endl;
                         int temp = curr;
+                        if(temp >= TREE_BRANCHES) {
+                            std::cout << "Error: Index exceeds Max branches" << std::endl;
+                            exit(1);
+                        }
                         curr++;
                         subtree->outlets[temp] = n->compactTree();
                         subtree->min[temp] = n->bb.min;
                         subtree->max[temp] = n->bb.max;
+                        continue;
                     }
 
                     if(n->l != NULL)
-                        st.push(std::make_pair(dn.first+1,n->l));
+                        st->push(std::make_pair(dn.first+1,n->l));
                     if(n->r != NULL)
-                        st.push(std::make_pair(dn.first+1,n->r));
+                        st->push(std::make_pair(dn.first+1,n->r));
 
-                    if(n->l == NULL && n->r == NULL && depth != DEPTH - 1) {
+                    if(n->l == NULL && n->r == NULL && depth != DEPTH) {
+                        //std::cout << "Compacting[" << curr << "]: " << this->start << "-" << this->start + this->range << "=" << n->start << "-" << n->start + n->range << std::endl;
                         int idx = curr;
+                        if(idx >= TREE_BRANCHES) {
+                            std::cout << "Error: Index exceeds Max branches" << std::endl;
+                            exit(1);
+                        }
                         curr++;
                         subtree->outlets[idx] = n->compactTree();
                         subtree->min[idx] = n->bb.min;
                         subtree->max[idx] = n->bb.max;
+                        continue;
                     }
                 }
+                delete st;
 
                 return subtree;
             }
@@ -358,6 +379,10 @@ namespace CMU462 {
                 // TODO (PathTracer):
                 // Implement a proper destructor for your BVH accelerator aggregate
 
+            }
+
+            std::vector<Primitive*> BVHAccel::getSortedPrimitives() {
+                return this->primitives;
             }
 
             BBox BVHAccel::get_bbox() const { return root->bb; }

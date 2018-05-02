@@ -42,6 +42,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/usr/share/cmake-3.9/Modules/Compiler/GNU.cmake"
   "/usr/share/cmake-3.9/Modules/Compiler/NVIDIA-CUDA.cmake"
   "/usr/share/cmake-3.9/Modules/FindFreetype.cmake"
+  "/usr/share/cmake-3.9/Modules/FindGLUT.cmake"
   "/usr/share/cmake-3.9/Modules/FindOpenGL.cmake"
   "/usr/share/cmake-3.9/Modules/FindPackageHandleStandardArgs.cmake"
   "/usr/share/cmake-3.9/Modules/FindPackageMessage.cmake"

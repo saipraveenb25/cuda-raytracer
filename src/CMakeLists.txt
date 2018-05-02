@@ -101,13 +101,14 @@ set(CUDA_SOURCE
 
     # Application
     application.cpp
-    main.cpp
+    cudaMain.cpp
     
     # Cuda Renderer
     cudaRenderer.cu
-
+    display.cpp
 )
 
+find_package(GLUT REQUIRED)
 
 #-------------------------------------------------------------------------------
 # Set include directories
@@ -117,6 +118,7 @@ include_directories(
   ${GLFW_INCLUDE_DIRS}
   ${CMU462_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
+  ${GLUT_INCLUDE_DIRS}
 )
 
 #-------------------------------------------------------------------------------
@@ -127,6 +129,7 @@ link_directories(
   ${GLFW_LIBRARY_DIRS}
   ${CMU462_LIBRARY_DIRS}
   ${FREETYPE_LIBRARY_DIRS}
+  ${GLUT_LIBRARY_DIRS}
 )
 
 #-------------------------------------------------------------------------------
@@ -139,6 +142,7 @@ target_link_libraries( scotty3d
     CMU462 ${CMU462_LIBRARIES}
     glew ${GLEW_LIBRARIES}
     glfw ${GLFW_LIBRARIES}
+    glut ${GLUT_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${CMAKE_THREADS_INIT}
@@ -148,6 +152,7 @@ target_link_libraries( scottyCuda
     CMU462 ${CMU462_LIBRARIES}
     glew ${GLEW_LIBRARIES}
     glfw ${GLFW_LIBRARIES}
+    glut ${GLUT_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${CMAKE_THREADS_INIT}

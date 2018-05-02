@@ -516,6 +516,33 @@ collada/sphere_info.cpp.s:
 	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scotty3d.dir/build.make src/CMakeFiles/scotty3d.dir/collada/sphere_info.cpp.s
 .PHONY : collada/sphere_info.cpp.s
 
+cudaMain.o: cudaMain.cpp.o
+
+.PHONY : cudaMain.o
+
+# target to build an object file
+cudaMain.cpp.o:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o
+.PHONY : cudaMain.cpp.o
+
+cudaMain.i: cudaMain.cpp.i
+
+.PHONY : cudaMain.i
+
+# target to preprocess a source file
+cudaMain.cpp.i:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.i
+.PHONY : cudaMain.cpp.i
+
+cudaMain.s: cudaMain.cpp.s
+
+.PHONY : cudaMain.s
+
+# target to generate assembly for a file
+cudaMain.cpp.s:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.s
+.PHONY : cudaMain.cpp.s
+
 cudaRenderer.o: cudaRenderer.cu.o
 
 .PHONY : cudaRenderer.o
@@ -542,6 +569,33 @@ cudaRenderer.s: cudaRenderer.cu.s
 cudaRenderer.cu.s:
 	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.s
 .PHONY : cudaRenderer.cu.s
+
+display.o: display.cpp.o
+
+.PHONY : display.o
+
+# target to build an object file
+display.cpp.o:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/display.cpp.o
+.PHONY : display.cpp.o
+
+display.i: display.cpp.i
+
+.PHONY : display.i
+
+# target to preprocess a source file
+display.cpp.i:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/display.cpp.i
+.PHONY : display.cpp.i
+
+display.s: display.cpp.s
+
+.PHONY : display.s
+
+# target to generate assembly for a file
+display.cpp.s:
+	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/display.cpp.s
+.PHONY : display.cpp.s
 
 dynamic_scene/joint.o: dynamic_scene/joint.cpp.o
 
@@ -819,7 +873,6 @@ main.o: main.cpp.o
 
 # target to build an object file
 main.cpp.o:
-	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/main.cpp.o
 	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scotty3d.dir/build.make src/CMakeFiles/scotty3d.dir/main.cpp.o
 .PHONY : main.cpp.o
 
@@ -829,7 +882,6 @@ main.i: main.cpp.i
 
 # target to preprocess a source file
 main.cpp.i:
-	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/main.cpp.i
 	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scotty3d.dir/build.make src/CMakeFiles/scotty3d.dir/main.cpp.i
 .PHONY : main.cpp.i
 
@@ -839,7 +891,6 @@ main.s: main.cpp.s
 
 # target to generate assembly for a file
 main.cpp.s:
-	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/main.cpp.s
 	cd /home/sassy/cs618/project/cudascotty && $(MAKE) -f src/CMakeFiles/scotty3d.dir/build.make src/CMakeFiles/scotty3d.dir/main.cpp.s
 .PHONY : main.cpp.s
 
@@ -1190,9 +1241,15 @@ help:
 	@echo "... collada/sphere_info.o"
 	@echo "... collada/sphere_info.i"
 	@echo "... collada/sphere_info.s"
+	@echo "... cudaMain.o"
+	@echo "... cudaMain.i"
+	@echo "... cudaMain.s"
 	@echo "... cudaRenderer.o"
 	@echo "... cudaRenderer.i"
 	@echo "... cudaRenderer.s"
+	@echo "... display.o"
+	@echo "... display.i"
+	@echo "... display.s"
 	@echo "... dynamic_scene/joint.o"
 	@echo "... dynamic_scene/joint.i"
 	@echo "... dynamic_scene/joint.s"

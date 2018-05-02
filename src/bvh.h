@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#define MAX_BRANCHES 16
+
 namespace CMU462 {
     namespace StaticScene {
 
@@ -20,28 +22,28 @@ namespace CMU462 {
          * constructing the BVH.
          */
         struct C_BVHSubTree {
-            uint64_t outlets[16];
+            uint64_t outlets[MAX_BRANCHES];
 
             size_t start;
             size_t range;
 
-            Vector3D min[16];
-            Vector3D max[16];
+            Vector3D min[MAX_BRANCHES];
+            Vector3D max[MAX_BRANCHES];
         };
         
         class BVHSubTree {
             public:
 
-            BVHSubTree* outlets[16];
+            BVHSubTree* outlets[MAX_BRANCHES];
 
             size_t start;
             size_t range;
 
-            Vector3D min[16];
-            Vector3D max[16];
+            Vector3D min[MAX_BRANCHES];
+            Vector3D max[MAX_BRANCHES];
 
            
-            int compress(std::vector<C_BVHSubTree>& tree, int* levelLists, int levelStride, std::vector<int>& levelCounts, int depth, int max_depth);
+            int compress(std::vector<C_BVHSubTree>* tree, int* levelLists, int levelStride, std::vector<int>* levelCounts, int depth, int max_depth);
         };
 
 
@@ -106,7 +108,7 @@ namespace CMU462 {
                  * \param primitives primitives to build from
                  * \param max_leaf_size maximum number of primitives to be stored in leaves
                  */
-                BVHAccel(const std::vector<Primitive*>& primitives, size_t max_leaf_size = 10);
+                BVHAccel(const std::vector<Primitive*>& primitives, size_t max_leaf_size = 32);
 
                 /**
                  * Destructor.
@@ -179,6 +181,11 @@ namespace CMU462 {
                  * Tree Compaction.
                  */
                  BVHSubTree* compactedTree();
+
+                 /**
+                 *
+                 */
+                 std::vector<Primitive*> getSortedPrimitives();
             private:
                 BVHNode* root;  ///< root node of the BVH
         };

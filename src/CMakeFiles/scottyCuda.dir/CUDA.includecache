@@ -119,12 +119,6 @@ stdio.h
 -
 vector
 -
-cuda.h
--
-cuda_runtime.h
--
-driver_functions.h
--
 cudaRenderer.h
 /home/sassy/cs618/project/cudascotty/src/cudaRenderer.h
 cuda_image.h
@@ -193,6 +187,12 @@ dynamic_scene/skeleton.h
 /home/sassy/cs618/project/cudascotty/src/dynamic_scene/skeleton.h
 dynamic_scene/joint.h
 /home/sassy/cs618/project/cudascotty/src/dynamic_scene/joint.h
+cuda.h
+-
+cuda_runtime.h
+-
+driver_functions.h
+-
 cuda_image.h
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
 bvh.h

@@ -777,28 +777,28 @@ src/CMakeFiles/scottyCuda.dir/application.cpp.o.provides: src/CMakeFiles/scottyC
 src/CMakeFiles/scottyCuda.dir/application.cpp.o.provides.build: src/CMakeFiles/scottyCuda.dir/application.cpp.o
 
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.o: src/CMakeFiles/scottyCuda.dir/flags.make
-src/CMakeFiles/scottyCuda.dir/main.cpp.o: src/main.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object src/CMakeFiles/scottyCuda.dir/main.cpp.o"
-	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/scottyCuda.dir/main.cpp.o -c /home/sassy/cs618/project/cudascotty/src/main.cpp
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/CMakeFiles/scottyCuda.dir/flags.make
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/cudaMain.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/scottyCuda.dir/cudaMain.cpp.o -c /home/sassy/cs618/project/cudascotty/src/cudaMain.cpp
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/scottyCuda.dir/main.cpp.i"
-	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sassy/cs618/project/cudascotty/src/main.cpp > CMakeFiles/scottyCuda.dir/main.cpp.i
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/scottyCuda.dir/cudaMain.cpp.i"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sassy/cs618/project/cudascotty/src/cudaMain.cpp > CMakeFiles/scottyCuda.dir/cudaMain.cpp.i
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/scottyCuda.dir/main.cpp.s"
-	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sassy/cs618/project/cudascotty/src/main.cpp -o CMakeFiles/scottyCuda.dir/main.cpp.s
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/scottyCuda.dir/cudaMain.cpp.s"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sassy/cs618/project/cudascotty/src/cudaMain.cpp -o CMakeFiles/scottyCuda.dir/cudaMain.cpp.s
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.o.requires:
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.requires:
 
-.PHONY : src/CMakeFiles/scottyCuda.dir/main.cpp.o.requires
+.PHONY : src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.requires
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.o.provides: src/CMakeFiles/scottyCuda.dir/main.cpp.o.requires
-	$(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/main.cpp.o.provides.build
-.PHONY : src/CMakeFiles/scottyCuda.dir/main.cpp.o.provides
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.provides: src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.requires
+	$(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.provides.build
+.PHONY : src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.provides
 
-src/CMakeFiles/scottyCuda.dir/main.cpp.o.provides.build: src/CMakeFiles/scottyCuda.dir/main.cpp.o
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.provides.build: src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o
 
 
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/CMakeFiles/scottyCuda.dir/flags.make
@@ -823,6 +823,30 @@ src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o.provides: src/CMakeFiles/scottyC
 .PHONY : src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o.provides
 
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o.provides.build: src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o
+
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.o: src/CMakeFiles/scottyCuda.dir/flags.make
+src/CMakeFiles/scottyCuda.dir/display.cpp.o: src/display.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object src/CMakeFiles/scottyCuda.dir/display.cpp.o"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/scottyCuda.dir/display.cpp.o -c /home/sassy/cs618/project/cudascotty/src/display.cpp
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/scottyCuda.dir/display.cpp.i"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sassy/cs618/project/cudascotty/src/display.cpp > CMakeFiles/scottyCuda.dir/display.cpp.i
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/scottyCuda.dir/display.cpp.s"
+	cd /home/sassy/cs618/project/cudascotty/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sassy/cs618/project/cudascotty/src/display.cpp -o CMakeFiles/scottyCuda.dir/display.cpp.s
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.o.requires:
+
+.PHONY : src/CMakeFiles/scottyCuda.dir/display.cpp.o.requires
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.o.provides: src/CMakeFiles/scottyCuda.dir/display.cpp.o.requires
+	$(MAKE) -f src/CMakeFiles/scottyCuda.dir/build.make src/CMakeFiles/scottyCuda.dir/display.cpp.o.provides.build
+.PHONY : src/CMakeFiles/scottyCuda.dir/display.cpp.o.provides
+
+src/CMakeFiles/scottyCuda.dir/display.cpp.o.provides.build: src/CMakeFiles/scottyCuda.dir/display.cpp.o
 
 
 # Object files for target scottyCuda
@@ -857,8 +881,9 @@ scottyCuda_OBJECTS = \
 "CMakeFiles/scottyCuda.dir/getopt.c.o" \
 "CMakeFiles/scottyCuda.dir/error_dialog.cpp.o" \
 "CMakeFiles/scottyCuda.dir/application.cpp.o" \
-"CMakeFiles/scottyCuda.dir/main.cpp.o" \
-"CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o"
+"CMakeFiles/scottyCuda.dir/cudaMain.cpp.o" \
+"CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o" \
+"CMakeFiles/scottyCuda.dir/display.cpp.o"
 
 # External object files for target scottyCuda
 scottyCuda_EXTERNAL_OBJECTS =
@@ -893,8 +918,9 @@ src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/getopt.c.o
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/error_dialog.cpp.o
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/application.cpp.o
-src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/main.cpp.o
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/display.cpp.o
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/build.make
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: CMU462/src/libCMU462.a
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: CMU462/deps/glew/libglew.a
@@ -908,13 +934,23 @@ src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/lib
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libm.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libXcursor.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGL.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libglut.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libXmu.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libXi.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGLU.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGL.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libfreetype.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libXxf86vm.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/librt.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libm.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libXcursor.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGL.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGLU.so
+src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGL.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libGLU.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: /usr/lib/x86_64-linux-gnu/libfreetype.so
 src/CMakeFiles/scottyCuda.dir/cmake_device_link.o: src/CMakeFiles/scottyCuda.dir/dlink.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Linking CUDA device code CMakeFiles/scottyCuda.dir/cmake_device_link.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Linking CUDA device code CMakeFiles/scottyCuda.dir/cmake_device_link.o"
 	cd /home/sassy/cs618/project/cudascotty/src && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/scottyCuda.dir/dlink.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -954,8 +990,9 @@ scottyCuda_OBJECTS = \
 "CMakeFiles/scottyCuda.dir/getopt.c.o" \
 "CMakeFiles/scottyCuda.dir/error_dialog.cpp.o" \
 "CMakeFiles/scottyCuda.dir/application.cpp.o" \
-"CMakeFiles/scottyCuda.dir/main.cpp.o" \
-"CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o"
+"CMakeFiles/scottyCuda.dir/cudaMain.cpp.o" \
+"CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o" \
+"CMakeFiles/scottyCuda.dir/display.cpp.o"
 
 # External object files for target scottyCuda
 scottyCuda_EXTERNAL_OBJECTS =
@@ -990,8 +1027,9 @@ scottyCuda: src/CMakeFiles/scottyCuda.dir/misc/sphere_drawing.cpp.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/getopt.c.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/error_dialog.cpp.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/application.cpp.o
-scottyCuda: src/CMakeFiles/scottyCuda.dir/main.cpp.o
+scottyCuda: src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o
+scottyCuda: src/CMakeFiles/scottyCuda.dir/display.cpp.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/build.make
 scottyCuda: CMU462/src/libCMU462.a
 scottyCuda: CMU462/deps/glew/libglew.a
@@ -1005,14 +1043,24 @@ scottyCuda: /usr/lib/x86_64-linux-gnu/librt.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libm.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libXcursor.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libGL.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libglut.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libXmu.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libXi.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libGLU.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libGL.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libfreetype.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libXxf86vm.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/librt.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libm.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libXcursor.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libGL.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libGLU.so
+scottyCuda: /usr/lib/x86_64-linux-gnu/libGL.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libGLU.so
 scottyCuda: /usr/lib/x86_64-linux-gnu/libfreetype.so
 scottyCuda: src/CMakeFiles/scottyCuda.dir/cmake_device_link.o
 scottyCuda: src/CMakeFiles/scottyCuda.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Linking CXX executable ../scottyCuda"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sassy/cs618/project/cudascotty/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Linking CXX executable ../scottyCuda"
 	cd /home/sassy/cs618/project/cudascotty/src && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/scottyCuda.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -1050,8 +1098,9 @@ src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/misc/spher
 src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/getopt.c.o.requires
 src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/error_dialog.cpp.o.requires
 src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/application.cpp.o.requires
-src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/main.cpp.o.requires
+src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o.requires
 src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o.requires
+src/CMakeFiles/scottyCuda.dir/requires: src/CMakeFiles/scottyCuda.dir/display.cpp.o.requires
 
 .PHONY : src/CMakeFiles/scottyCuda.dir/requires
 
