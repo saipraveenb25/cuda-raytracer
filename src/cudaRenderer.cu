@@ -140,6 +140,12 @@ namespace cutracer {
     }
 
     __device__ __inline__ float intersectBBox(float3 o, float3 d, float3 min, float3 max) {
+        
+        if((o.x >= min.x && o.x <= max.x) 
+            && (o.y >= min.y && o.y <= max.y) 
+            && (o.z >= min.z && o.z <= max.z))
+            return 0.0;
+
         float tmin = (min.x - o.x) / d.x; 
         float tmax = (max.x - o.x) / d.x; 
 
@@ -340,6 +346,7 @@ namespace cutracer {
             r->ss = ss;
             r->sid = i;
             r->id = destIndex;
+            r->valid = true;
         }
 
     }
@@ -354,14 +361,17 @@ namespace cutracer {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
 
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
+        
 
         CuEmitter *e = &cuConstRendererParams.emitters[0];
 
         // Generate the sample.
-        float sampleX;
-        float sampleY;
+        float sampleX = 0.5f;
+        float sampleY = 0.5f;
 
         CuRay *r = &cuConstRendererParams.queues[iid];
+        if(!its->valid) 
+            r->valid = false;
 
         float3 d = e->position + sampleX * e->dim_x + sampleY * e->dim_y - its->pt;
         float cosTheta = dot(d, e->direction);
@@ -382,6 +392,7 @@ namespace cutracer {
         r->n = its->n;
         r->wi = its->wi;
         r->t = its->t;
+        r->valid = true;
         //return cosTheta < 0 ? radiance : Spectrum();
 
 
@@ -776,32 +787,6 @@ namespace cutracer {
                 }
 
                 __syncthreads();
-                //return;
-                //return;
-                // Write out.
-                //if(target == (uint64_t)-1) {
-                // Illegal target.
-                //    __syncthreads();
-                //    __syncthreads();
-                //    continue;
-                //} 
-
-                //if(subindex >=_c_outlets[(i+1) * RAYS_PER_BLOCK - 1]) {
-                // Leave.
-                //    __syncthreads();
-                //    __syncthreads();
-                //    continue;
-                //}
-
-                /*if(subindex == 32 && blockIdx.x == 15) 
-                  printf("%d ---------------------GGGG-------------------It's 32 %d, %d\n", i, tindex, target);
-                  if(subindex == 31 && blockIdx.x == 15) 
-                  printf("%d ---------------------GGGG-------------------It's 31 %d, %d\n", i, tindex, target);*/
-                /*if(subindex == 32 && blockIdx.x == 15) 
-                  printf("%d ---------------------HHHH-------------------It's 32 %d\n", i, tindex);
-                  if(subindex == 31 && blockIdx.x == 15) 
-                  printf("%d ---------------------HHHH-------------------It's 31 %d\n", i, tindex);*/
-
                 for(int i = 0; i < TREE_WIDTH; i++) {
                     uint64_t target = subtree.outlets[i];
 
@@ -845,10 +830,6 @@ namespace cutracer {
 
             } else {
 
-                //if(index == 2100)
-                //    printf("LEAF NODE: %d\n", index);
-                //return;
-                // This is a leaf node. Quickly load whatever all triangles.
                 __shared__ CuTriangle _triangles[MAX_TRIANGLES];
                 int num_triangles = cuConstRendererParams.bvhSubTrees[snode].range;
 
@@ -875,12 +856,6 @@ namespace cutracer {
                         //if(subindex == 0 && (start + i > 1733) && (start + i < 1745)){
 
                         float thist = intersectRayTriangle(_triangles[i].a, _triangles[i].b, _triangles[i].c, r->o, r->d);
-                        /*if(r->id == 33024) {
-                            printf("TRIANGLE@%d,%d, %d (%f): %f %f %f \t %f %f %f \t %f %f %f :: \t %f %f %f \t %f %f %f\n", snode, i+start, num_triangles, thist, _triangles[i].a.x, _triangles[i].a.y, _triangles[i].a.z, _triangles[i].b.x, _triangles[i].b.y, _triangles[i].b.z, _triangles[i].c.x, _triangles[i].c.y, _triangles[i].c.z, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z);
-                        }*/
-                        //if(thist != -1.0) {
-                            //printf("TRIANGLE@%d,%d: %f %f %f \t %f %f %f \t %f %f %f :: \t %f %f %f \t %f %f %f\n", snode, i, _triangles[i].a.x, _triangles[i].a.y, _triangles[i].a.z, _triangles[i].b.x, _triangles[i].b.y, _triangles[i].b.z, _triangles[i].c.x, _triangles[i].c.y, _triangles[i].c.z, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z);
-                        //}
                         if(thist < t && thist >= 0){
                             //if(thist >= 0){
                             t = thist;
