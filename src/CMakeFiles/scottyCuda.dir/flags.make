@@ -10,7 +10,7 @@ C_DEFINES =
 
 C_INCLUDES = -I/home/sassy/cs618/project/cudascotty/CMU462/include -I/usr/include/freetype2 
 
-CUDA_FLAGS = -std=c++11 -g  
+CUDA_FLAGS = -std=c++11 --gpu-architecture=compute_60 -g  
 
 CUDA_DEFINES = 
 

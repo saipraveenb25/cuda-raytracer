@@ -219,10 +219,10 @@ namespace cutracer {
         float d = dot(N, v0); 
 
         // compute t (equation 3)
-        float t = (dot(N, orig) + d) / NdotRayDirection; 
+        float t = (d - dot(N, orig)) / NdotRayDirection; 
 
         // check if the triangle is in behind the ray
-        if (t < 0) return -1; // the triangle is behind 
+        if (t < 0) return t; // the triangle is behind 
 
         // compute the intersection point using equation 1
         float3 P = orig + t * dir; 
@@ -234,19 +234,19 @@ namespace cutracer {
         float3 edge0 = v1 - v0;
         float3 vp0 = P - v0;
         C = cross(edge0, vp0);
-        if (dot(N, C) < 0) return -1; // P is on the right side 
+        if (dot(N, C) < 0) return -3; // P is on the right side 
 
         // edge 1
         float3 edge1 = v2 - v1; 
         float3 vp1 = P - v1; 
         C = cross(edge1, vp1); 
-        if (dot(N, C) < 0)  return -1; // P is on the right side 
+        if (dot(N, C) < 0)  return -4; // P is on the right side 
 
         // edge 2
         float3 edge2 = v0 - v2; 
         float3 vp2 = P - v2; 
         C = cross(edge2, vp2); 
-        if (dot(N, C) < 0) return -1; // P is on the right side; 
+        if (dot(N, C) < 0) return -5; // P is on the right side; 
 
         return t; // this ray hits the triangle 
     }
@@ -319,7 +319,7 @@ namespace cutracer {
             //float b = (ss.y / height) - 0.5;
             //float c = sqrt(1 - (a*a + b*b));
             
-            float3 k = make_float3((ss.x/width)-0.5, (ss.y/height)-0.5,1.0);
+            float3 k = make_float3((ss.y/width)-0.5, -((ss.x/height)-0.5),1.0);
             k = k / length(k);
 
             //float px = a * cuConstRendererParams.c_left.x + b * cuConstRendererParams.c_up.x + c * cuConstRendererParams.c_lookAt.x;
@@ -361,10 +361,6 @@ namespace cutracer {
         float sampleX;
         float sampleY;
 
-        //float lX = (sampleX * e->minl.x + (1 - sampleX) * e->maxl.x);
-        //float lY = (sampleY * e->minl.y + (1 - sampleY) * e->maxl.y);
-        //float lZ = e->lmin.z; // Assume e->lmin.z = e->lmax.z;
-        //Vector2D sample = sampler.get_sample() - Vector2D(0.5f, 0.5f);
         CuRay *r = &cuConstRendererParams.queues[iid];
 
         float3 d = e->position + sampleX * e->dim_x + sampleY * e->dim_y - its->pt;
@@ -421,7 +417,7 @@ namespace cutracer {
     __global__ void kernelPrintLevelLists(int level, int total) {
         for(int i = 0; i < total; i++) {
             int nidx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + i];
-            //printf("%d->%d\n", nidx, cuConstRendererParams.qCounts[nidx]);
+            printf("%d->%d\n", nidx, cuConstRendererParams.qCounts[nidx]);
         }
     }
 
@@ -641,12 +637,12 @@ namespace cutracer {
             //subtree.minl[index * 2 + 1] = cuConstRendererParams.bvhSubTrees[snode].minl[index * 2 + 1];
             subtree.maxl[subindex + 0] = cuConstRendererParams.bvhSubTrees[snode].maxl[subindex + 0];
             //subtree.maxl[index * 2 + 1] = cuConstRendererParams.bvhSubTrees[snode].maxl[index * 2 + 1];
-            if(subtree.outlets[subindex] != (uint64_t)-1) {
+            /*if(subtree.outlets[subindex] != (uint64_t)-1) {
                 uint64_t start = cuConstRendererParams.bvhSubTrees[subtree.outlets[subindex]].start;
                 uint64_t range = cuConstRendererParams.bvhSubTrees[subtree.outlets[subindex]].range;
                 //printf("%lu-> [%lu-%lu] %f %f %f \t %f %f %f\n", subtree.outlets[subindex], start, start + range, subtree.minl[subindex].x, subtree.minl[subindex].y, subtree.minl[subindex].z, subtree.maxl[subindex].x, subtree.maxl[subindex].y, subtree.maxl[subindex].z);
                 // printf("%lu-> [%d-%d] %f %f %f \t %f %f %f\n", subtree.outlets[subindex], subtree.start, subtree.start + subtree.range, subtree.minl[subindex].x. subtree.minl[subindex].y, subtree.minl[subindex].z, subtree.maxl[subindex].x, subtree.maxl[subindex].y, subtree.maxl[subindex].z);
-            }
+            }*/
         }
         __syncthreads();
 
@@ -655,7 +651,7 @@ namespace cutracer {
             __shared__ uint _outlets[TREE_WIDTH * RAYS_PER_BLOCK];
             __shared__  uint _c_outlets[TREE_WIDTH * RAYS_PER_BLOCK];
             //__shared__ uint _compacter[TREE_WIDTH * RAYS_PER_BLOCK];
-            __shared__ uint _c_qid[TREE_WIDTH * RAYS_PER_BLOCK];
+            __shared__ uint _c_qid[2 * TREE_WIDTH * RAYS_PER_BLOCK];
             //__shared__ uint _scratch[TREE_WIDTH * RAYS_PER_BLOCK];
             //if(index == 0)
             //    printf("STREE: %d, %d\n", is_leaf, index);
@@ -688,22 +684,25 @@ namespace cutracer {
 
                 for(int i = 0; i < TREE_WIDTH; i++) {
                     // Intersect the rays here.
+                    if(r->id == 33024) {
+                        printf("OUTLET[%d]=%lu\n", i, subtree.outlets[i]);
+                    }
                     if(subtree.outlets[i] == (uint64_t)-1) continue;
 
                     float t = intersectBBox(r->o, r->d, subtree.minl[i], subtree.maxl[i]);
                     //if(index == 1336) {
-                    if(subindex == 32 && blockIdx.x == 15) {
-                        printf("It's 32 -----------------RRR--------------\n");
-                        printf("index: %d\n", index);
-                        printf("i: %d\n", i);
-                        printf("SID: %d/%d, t: %f\n", r->id, rayCount, t);
+                    if(r->id == 33024) {
+                        //printf("It's 32 -----------------RRR--------------\n");
+                        printf("snode: %d->%lu index: %d i: %d \n RID: %d/%d, t:%f \n min: %f %f %f \n max: %f %f %f \n ss: %f %f \n is_leaf: %d\n\n\n", snode, subtree.outlets[i], index, i, r->id, rayCount, t,  subtree.minl[i].x, subtree.minl[i].y, subtree.minl[i].z, subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z, r->ss.x, r->ss.y, cuConstRendererParams.bvhSubTrees[subtree.outlets[i]].range != 0);
+                        //printf("i: %d\n", i);
+                        //printf("SID: %d/%d, t: %f\n", r->id, rayCount, t);
 
                         // TODO: Make sure we account for points inside the box too.
-                        printf("O: %f %f %f\n", r->o.x, r->o.y, r->o.z);
-                        printf("D: %f %f %f\n", r->d.x, r->d.y, r->d.z);
-                        printf("min: %f %f %f\n", subtree.minl[i].x, subtree.minl[i].y, subtree.minl[i].z);
-                        printf("max: %f %f %f\n", subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z);
-                        printf("ss: %f %f\n", r->ss.x, r->ss.y); 
+                        //printf("O: %f %f %f\n", r->o.x, r->o.y, r->o.z);
+                        //printf("D: %f %f %f\n", r->d.x, r->d.y, r->d.z);
+                        //printf("min: %f %f %f\n",);
+                        //printf("max: %f %f %f\n", subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z);
+                        //printf("ss: %f %f\n", r->ss.x, r->ss.y); 
                     }
                     if( t >= 0 ) {
                         // If intersected, place a mark.
@@ -715,7 +714,7 @@ namespace cutracer {
 
                 }
 
-                }
+           }
 
                 //return;
                 // Perform compaction on every 512x:(512x + 512)
@@ -738,12 +737,24 @@ namespace cutracer {
                 //return;
                 //sharedMemExclusiveScan(thread, _assignments, _compacter[sliceIdx * size], &scratch[sliceIdx * size], size);
                 for(int i = 0; i < TREE_WIDTH; i++) {
-                    //if((i * RAYS_PER_BLOCK + subindex) > TREE_WIDTH * RAYS_PER_BLOCK)
-                    //    printf("EXSCAN: %d, %d, %d, %d\n", RAYS_PER_BLOCK, subindex, TREE_WIDTH, blockDim.x);
-                    //else 
-                    sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[i * RAYS_PER_BLOCK], RAYS_PER_BLOCK);
+                    //if(subtree.outlets[i] == (uint64_t)-1) continue;
+                    
+                    sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[i * 2 * RAYS_PER_BLOCK], RAYS_PER_BLOCK);
                 }
                 __syncthreads();
+
+                /*if(subindex == 0) {
+                    if(_c_outlets[RAYS_PER_BLOCK - 1] % 4 != 0) {
+                        printf("BLOCK: %d Request: %d IDX: %d RC: %d\n", blockIdx.x, _c_outlets[RAYS_PER_BLOCK - 1], index, rayCount);
+                        for(int i = 0; i < RAYS_PER_BLOCK; i+=4)
+                            printf("%d:%d%d%d%d ", i, _outlets[i], _outlets[i+1], _outlets[i+2], _outlets[i+3]);
+                        printf("\n");
+                        //for(int i = 0; i < RAYS_PER_BLOCK; i++)
+                        //    printf("%d:%d ", i, _c_outlets[i]);
+                        //printf("\n");
+                    } 
+
+                }*/
                 //return;
                 // Rearrange.
                 for(int i = 0; i < TREE_WIDTH; i++) {
@@ -765,6 +776,7 @@ namespace cutracer {
                 }
 
                 __syncthreads();
+                //return;
                 //return;
                 // Write out.
                 //if(target == (uint64_t)-1) {
@@ -796,13 +808,13 @@ namespace cutracer {
                     __syncthreads();
                     // Atomic grab.
                     //if (raylist[rayid].id == 1536) {
-
+                    int numRays = _c_outlets[(i+1) * RAYS_PER_BLOCK - 1] + _outlets[(i+1) * RAYS_PER_BLOCK - 1];
                     if(subindex == 0 && (target != (uint64_t)-1)){
-                        tindex = atomicAdd(&cuConstRendererParams.qCounts[target], _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]);
+                        tindex = atomicAdd(&cuConstRendererParams.qCounts[target], numRays);
                     }
                     __syncthreads();
 
-                    if((target != (uint64_t)-1) && subindex < _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]) { 
+                    if((target != (uint64_t)-1) && subindex < numRays) { 
                         int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
                         cuConstRendererParams.queues[maxRayCount * target + tindex + subindex] = raylist[rayid];
                     }
@@ -860,14 +872,15 @@ namespace cutracer {
                 if(index < rayCount) {
                     for(int i = 0; i < num_triangles; i++) {
                         int start = cuConstRendererParams.bvhSubTrees[snode].start;
-                        /*if(subindex == 0 && (start + i > 1733) && (start + i < 1745)){
-                            printf("TRIANGLE@%d,%d, %d: %f %f %f \t %f %f %f \t %f %f %f :: \t %f %f %f \t %f %f %f\n", snode, i+start, num_triangles, _triangles[i].a.x, _triangles[i].a.y, _triangles[i].a.z, _triangles[i].b.x, _triangles[i].b.y, _triangles[i].b.z, _triangles[i].c.x, _triangles[i].c.y, _triangles[i].c.z, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z);
-                        }*/
+                        //if(subindex == 0 && (start + i > 1733) && (start + i < 1745)){
 
                         float thist = intersectRayTriangle(_triangles[i].a, _triangles[i].b, _triangles[i].c, r->o, r->d);
-                        if(thist != -1.0) {
+                        /*if(r->id == 33024) {
+                            printf("TRIANGLE@%d,%d, %d (%f): %f %f %f \t %f %f %f \t %f %f %f :: \t %f %f %f \t %f %f %f\n", snode, i+start, num_triangles, thist, _triangles[i].a.x, _triangles[i].a.y, _triangles[i].a.z, _triangles[i].b.x, _triangles[i].b.y, _triangles[i].b.z, _triangles[i].c.x, _triangles[i].c.y, _triangles[i].c.z, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z);
+                        }*/
+                        //if(thist != -1.0) {
                             //printf("TRIANGLE@%d,%d: %f %f %f \t %f %f %f \t %f %f %f :: \t %f %f %f \t %f %f %f\n", snode, i, _triangles[i].a.x, _triangles[i].a.y, _triangles[i].a.z, _triangles[i].b.x, _triangles[i].b.y, _triangles[i].b.z, _triangles[i].c.x, _triangles[i].c.y, _triangles[i].c.z, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z);
-                        }
+                        //}
                         if(thist < t && thist >= 0){
                             //if(thist >= 0){
                             t = thist;
@@ -879,10 +892,10 @@ namespace cutracer {
                 }
 
 
-                int x = static_cast<int>(r->ss.x);
-                int y = static_cast<int>(r->ss.y);
+                //int x = static_cast<int>(r->ss.x);
+                //int y = static_cast<int>(r->ss.y);
 
-                int sid = r->sid;
+                //int sid = r->sid;
 
                 int imageWidth = cuConstRendererParams.imageWidth;
                 int imageHeight = cuConstRendererParams.imageHeight;
@@ -909,9 +922,6 @@ namespace cutracer {
 
                 // Take a token.
                 int token = atomicAdd(tokens, 1);
-                //if (t != INFINITY && (index < rayCount))
-                //    printf("ITS RAY:-> %d, %d -> %d t:%f iid:%d token:%d\n", x, y, sid, t, iid, token);
-
                 bool direct_light = !(r->lightImportance == make_float3(0.0, 0.0, 0.0));
                 if(!direct_light) {
                     // Overwrite the intersection.
@@ -971,9 +981,9 @@ namespace cutracer {
 
             __global__ void kernelRayIntersectSingle(int snode) {
                 int index = blockDim.x * blockIdx.x + threadIdx.x;
-                if(index == 0) {
-                    printf("INDEX: %d\n\n", index);
-                }
+                //if(index == 0) {
+                //    printf("INDEX: %d\n\n", index);
+                //}
                 rayIntersectSingle(snode, index);
             }
 
@@ -1012,16 +1022,13 @@ namespace cutracer {
 
                 int nodeIndex = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + levelIndex];
                 int rayIndex = (blockIdx.x * blockDim.x + threadIdx.x) % (imageWidth * imageHeight * sampleCount);
-                //if(threadIdx.x == 0) {
-                //    printf("%d, %d, %d, %d = %d,%d,%d\n", levelIndex, nodeIndex, rayIndex, imageWidth * imageHeight * sampleCount, blockIdx.x, blockDim.x, threadIdx.x); 
-                //}
-                //return;
-
+                
                 //if(rayIndex == 0){
+                //    printf("At %d\n", nodeIndex);
                 //}
-                //return;
-
+                //if(level < 4) { 
                 rayIntersectSingle(nodeIndex, rayIndex);
+                //}
             }
 
 
@@ -1107,8 +1114,8 @@ namespace cutracer {
                                                             c_pos = (transform * Vector4D(c_pos, 1)).to3D();
                                                             c_dir = (transform * Vector4D(c->view_dir, 1)).to3D().unit();
                                                             std::cout << "Camera parameters: " << std::endl;
-                                                            this->c_lookAt = c_dir;
-                                                            this->c_origin = -c_pos;
+                                                            this->c_lookAt = -c_dir;
+                                                            this->c_origin = c_pos + Vector3D(0, 0.5, 0);
                                                             Vector3D acup(0.0f, 1.0f, 0.0f);
                                                             this->c_left = cross(acup, c_dir).unit();
                                                             this->c_up = cross(this->c_left, c_dir).unit();
@@ -1563,23 +1570,23 @@ namespace cutracer {
 
                 // Compute level indices.
                 for(int level = 1; level < levelCounts.size(); level ++) {
+                    //if(level != levelCounts.size() - 1) {
+                    printf("kernelPrintLevelLists\n");
+                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
+                    cudaDeviceSynchronize();
+                    //}
                     // for(int level = 1; level < 2; level++) {
                     int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
                     int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
                     printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
 
                     dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                     dim3 rayIntersectLevelGridDim(numBlocks, 1);
-                    kernelRayIntersectLevel<<<rayIntersectLevelGridDim, rayIntersectLevelBlockDim>>>(level);
+                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
                     cudaDeviceSynchronize();
 
-                    if(level != levelCounts.size() - 1) {
-                        printf("kernelPrintLevelLists\n");
-                        kernelPrintLevelLists<<<1,1>>>(level + 1, levelCounts[level + 1]);
-                        cudaDeviceSynchronize();
-                    }
                 }
-
 
                 //cudaDeviceSynchronize();
 

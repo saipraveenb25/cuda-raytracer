@@ -71,7 +71,7 @@ if(LINUX)
   if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 
     set(GCC_CXX_FLAGS "-std=gnu++11 -m64")
-    set(CMAKE_CUDA_FLAGS "-std=c++11")
+    set(CMAKE_CUDA_FLAGS "-std=c++11 --gpu-architecture=compute_60")
     
     # X11 Dependencies
     if(NOT BUILD_LIBCMU462)
