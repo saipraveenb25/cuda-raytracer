@@ -72,8 +72,7 @@ int main(int argc, char** argv)
       return 1;
       }
       }*/
-    // end parsing of commandline options //////////////////////////////////////
-    
+    // end parsing of commandline options ////////////////////////////////////// 
 
 
     if (optind + 1 > argc) {

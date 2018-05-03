@@ -11,7 +11,7 @@
 //#include "util.h"
 //#include "cycleTimer.h"
 
-#define SCAN_BLOCK_DIM 128  // needed by sharedMemExclusiveScan implementation
+#define SCAN_BLOCK_DIM 512  // needed by sharedMemExclusiveScan implementation
 #include "exclusiveScan.cu_inl"
 
 #include "cuda_util.h"
@@ -370,18 +370,26 @@ namespace cutracer {
         float sampleY = 0.5f;
 
         CuRay *r = &cuConstRendererParams.queues[iid];
-        if(!its->valid) 
-            r->valid = false;
+        if(iid > 30000 && iid < 30200) {
+            printf("INTERSECTION: %d %d %d\n", iid, its->valid, r->id);
+        }
 
-        float3 d = e->position + sampleX * e->dim_x + sampleY * e->dim_y - its->pt;
+        if(!its->valid){ 
+            r->valid = false;
+            return;
+        }
+        
+        float3 lpt = e->position + sampleX * e->dim_x + sampleY * e->dim_y;
+        float3 d =  lpt - its->pt;
         float cosTheta = dot(d, e->direction);
         float sqDist = dot(d,d);
         float dist = sqrt(sqDist);
         r->d = d / dist;
+        r->o = its->pt;
         float distToLight = dist;
         float pdf = sqDist / (e->area * abs(cosTheta));
         float fpdf = abs(dot(its->n, r->d))/ pdf;
-        r->lightImportance = its->importance * make_float3(fpdf, fpdf, fpdf);
+        r->lightImportance = its->importance * make_float3(fpdf, fpdf, fpdf) * e->radiance;
         r->maxT = distToLight;
         r->importance = its->importance;
         r->sid = its->sid;
@@ -393,36 +401,20 @@ namespace cutracer {
         r->wi = its->wi;
         r->t = its->t;
         r->valid = true;
-        //return cosTheta < 0 ? radiance : Spectrum();
 
-
-        // Conenct light to point.
-
-        /*float dX = -its->pt.x + lX;
-          float dY = -its->pt.y + lY;
-          float dZ = -its->pt.z + lZ;
-
-
-          float l = sqrt(dX * dX + dY * dY + dZ * dZ);
-
-
-          float3 d = make_float3(dX / l, dY / l, dZ / l);
-          float3 o = its->pt;
-          r->d = d;
-          r->o = o;
-        //float3 importance;// copy total importance.
-        //float3 lightImportance; // Compute (n.l)/(p - l)^2
-
-        //float3 light; // copy light.
-
-        r->light = its->light;
-        r->importance = its->importance;
-        float invLight = 1.0f / dot(r->d - its->pt, r->d - its->pt);
-
-        //r->lightImportance = its->importance * e->radiance * e->area * dot(e->direction, r->d) * dot(its->n, r->d) * invLight;// Compute (n.l) / (p - l)^2
-        //r->maxT = sqrt(dot(r->d - its->pt, r->d - its->pt)) - 0.01f;
-        //r->lightImportance = make_float3(xf, xf, xf);*/
-        //r->sid = its->sid;
+        if(r->id > 30000 && r->id < 30200 && its->valid) {
+            printf("INTERSECTION\n");
+            printf("d: %f %f %f\n", r->d.x, r->d.y, r->d.z);
+            printf("o: %f %f %f\n", r->o.x, r->o.y, r->o.z);
+            printf("lightImportance: %f %f %f\n", r->lightImportance.x, r->lightImportance.y, r->lightImportance.z);
+            printf("maxT: %f\n", r->maxT);
+            printf("ID: %d\n", r->id);
+            printf("SID: %d\n", r->sid);
+            //printf("importance: %f %f %f\n", r->importance.x, r->importance.y, r->importance.z);
+            //printf("its importance: %f %f %f\n", its->importance.x, its->importance.y, its->importance.z);
+            printf("ID: %d SS: %f %f o: %f %f %f lpt: %f %f %f pt: %f %f %f t: %f d: %f %f %f its n: %f %f %f r->d: %f %f %f light: %f %f %f NEW: %d\n", r->id, r->ss.x, r->ss.y, r->o.x, r->o.y, r->o.z, lpt.x, lpt.y, lpt.z, its->pt.x, its->pt.y, its->pt.z, its->t, r->d.x, r->d.y, r->d.z, its->n.x, its->n.y, its->n.z, r->d.x, r->d.y, r->d.z, r->light.x, r->light.y, r->light.z, its->is_new);
+            //printf("its n: %f %f %f\n", its->n.x, its->n.y, its->n.z);
+        }
     }
 
     __global__ void kernelPrintLevelLists(int level, int total) {
@@ -443,6 +435,12 @@ namespace cutracer {
         cuConstRendererParams.minT[iid] = INFINITY;
         cuConstRendererParams.intersectionTokens[iid] = 0;
     }
+
+    //__global__ void kernelClearIntersectionApparatus( ) {
+    //    int iid = blockIdx.x * blockDim.x + threadIdx.x;
+    //    cuConstRendererParams.minT[iid] = INFINITY;
+    //    cuConstRendererParams.intersectionTokens[iid] = 0; 
+    //}
 
     __global__ void kernelMergeIntersections( ) {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -575,6 +573,22 @@ namespace cutracer {
         cuConstRendererParams.imageData[idx] = color;
     }
 
+    __global__ void kernelResetCounts( ) {
+        int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        int width = cuConstRendererParams.imageWidth;
+        int height = cuConstRendererParams.imageHeight;
+        int sampleCount = cuConstRendererParams.sampleCount;
+        
+        int totalRays = width * height * sampleCount;
+
+        if(idx == 0)
+            cuConstRendererParams.qCounts[idx] = totalRays;
+        else
+            cuConstRendererParams.qCounts[idx] = 0;
+        
+
+    }
+
     // Intersection functions
     // Performs ray intersect on a single node.
     __device__ void rayIntersectSingle(int snode, int index) {
@@ -623,8 +637,8 @@ namespace cutracer {
         __shared__ CuBVHSubTree subtree;
         //bool is_leaf = (cuConstRendererParams.bvhSubTrees[snode].range != 0);
         //printf("%d, %d\n", is_leaf, index);
-        //if(index == 0)
-        //    printf("STREE: %d, %d: %d, %d\n", is_leaf, index, rayCount, maxRayCount);
+        //if(r->valid && index < 200 && index < rayCount)
+        //    printf("STREE: %d, %d: %d, %d valid: %d\n", is_leaf, index, rayCount, maxRayCount, r->valid);
 
         //if(is_leaf) {
         //printf("LEAFFF: %d, %d: %d, %d\n", is_leaf, index, rayCount, maxRayCount); 
@@ -641,19 +655,10 @@ namespace cutracer {
         //    printf("AFTER STREE: %d, %d\n", is_leaf, index);
 
         // TODO: Test of RAYS_PER_BLOCK being a power of 2.
-        __syncthreads();
         if(subindex < TREE_WIDTH) {
             subtree.outlets[subindex] = cuConstRendererParams.bvhSubTrees[snode].outlets[subindex];
             subtree.minl[subindex + 0] = cuConstRendererParams.bvhSubTrees[snode].minl[subindex + 0];
-            //subtree.minl[index * 2 + 1] = cuConstRendererParams.bvhSubTrees[snode].minl[index * 2 + 1];
             subtree.maxl[subindex + 0] = cuConstRendererParams.bvhSubTrees[snode].maxl[subindex + 0];
-            //subtree.maxl[index * 2 + 1] = cuConstRendererParams.bvhSubTrees[snode].maxl[index * 2 + 1];
-            /*if(subtree.outlets[subindex] != (uint64_t)-1) {
-                uint64_t start = cuConstRendererParams.bvhSubTrees[subtree.outlets[subindex]].start;
-                uint64_t range = cuConstRendererParams.bvhSubTrees[subtree.outlets[subindex]].range;
-                //printf("%lu-> [%lu-%lu] %f %f %f \t %f %f %f\n", subtree.outlets[subindex], start, start + range, subtree.minl[subindex].x, subtree.minl[subindex].y, subtree.minl[subindex].z, subtree.maxl[subindex].x, subtree.maxl[subindex].y, subtree.maxl[subindex].z);
-                // printf("%lu-> [%d-%d] %f %f %f \t %f %f %f\n", subtree.outlets[subindex], subtree.start, subtree.start + subtree.range, subtree.minl[subindex].x. subtree.minl[subindex].y, subtree.minl[subindex].z, subtree.maxl[subindex].x, subtree.maxl[subindex].y, subtree.maxl[subindex].z);
-            }*/
         }
         __syncthreads();
 
@@ -668,8 +673,7 @@ namespace cutracer {
             //    printf("STREE: %d, %d\n", is_leaf, index);
             //int subindex = index % (RAYS_PER_BLOCK);
 
-            __syncthreads();
-
+            float minT = cuConstRendererParams.minT[r->id];
             /*if(index == 2100) {
               printf("SubTree: Start->%lu\n", subtree.start);
               printf("SubTree: Range->%lu\n", subtree.range);
@@ -681,7 +685,7 @@ namespace cutracer {
               printf("SubTree: Max[%d]->%f %f %f\n", i, subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z);
 
             //printf("SUBTREE_TEST: %d\n",cuConstRendererParams.bvhSubTrees[0].outlets[0]);
-            printf("\n");
+                printf("\n");
             }*/
 
             for(int i = 0; i < TREE_WIDTH; i++) {
@@ -690,32 +694,18 @@ namespace cutracer {
             //return;
             __syncthreads();
 
-
-            if(index < rayCount) {
+            if(index < rayCount && r->valid) {
 
                 for(int i = 0; i < TREE_WIDTH; i++) {
                     // Intersect the rays here.
-                    if(r->id == 33024) {
-                        printf("OUTLET[%d]=%lu\n", i, subtree.outlets[i]);
-                    }
+                    //if(r->id == 33024) {
+                        //printf("OUTLET[%d]=%lu\n", i, subtree.outlets[i]);
+                    //}
                     if(subtree.outlets[i] == (uint64_t)-1) continue;
 
                     float t = intersectBBox(r->o, r->d, subtree.minl[i], subtree.maxl[i]);
-                    //if(index == 1336) {
-                    if(r->id == 33024) {
-                        //printf("It's 32 -----------------RRR--------------\n");
-                        printf("snode: %d->%lu index: %d i: %d \n RID: %d/%d, t:%f \n min: %f %f %f \n max: %f %f %f \n ss: %f %f \n is_leaf: %d\n\n\n", snode, subtree.outlets[i], index, i, r->id, rayCount, t,  subtree.minl[i].x, subtree.minl[i].y, subtree.minl[i].z, subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z, r->ss.x, r->ss.y, cuConstRendererParams.bvhSubTrees[subtree.outlets[i]].range != 0);
-                        //printf("i: %d\n", i);
-                        //printf("SID: %d/%d, t: %f\n", r->id, rayCount, t);
-
-                        // TODO: Make sure we account for points inside the box too.
-                        //printf("O: %f %f %f\n", r->o.x, r->o.y, r->o.z);
-                        //printf("D: %f %f %f\n", r->d.x, r->d.y, r->d.z);
-                        //printf("min: %f %f %f\n",);
-                        //printf("max: %f %f %f\n", subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z);
-                        //printf("ss: %f %f\n", r->ss.x, r->ss.y); 
-                    }
-                    if( t >= 0 ) {
+                    
+                    if( t >= 0 && t <= minT ) {
                         // If intersected, place a mark.
                         _outlets[i * RAYS_PER_BLOCK + subindex] = 1;
                         //printf("RAY %d,%d,%d: %f\n", i, RAYS_PER_BLOCK, subindex, t);
@@ -809,7 +799,7 @@ namespace cutracer {
                       }*/
                     //}
 
-                    /*if(subindex == 0 && (target != (uint64_t)-1) && (subindex < _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]) ){
+                    /*if(index == 0 && (target != (uint64_t)-1) && (subindex < _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]) ){
                     //subtree.
                     //CuBVHSubTree subtree = cuConstRendererParams.bvhSubTrees[snode];
                     int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
@@ -850,11 +840,10 @@ namespace cutracer {
 
                 CuTriangle tri;
                 // Perform triangle intersect.
-                if(index < rayCount) {
+                if(index < rayCount && r->valid) {
                     for(int i = 0; i < num_triangles; i++) {
                         int start = cuConstRendererParams.bvhSubTrees[snode].start;
                         //if(subindex == 0 && (start + i > 1733) && (start + i < 1745)){
-
                         float thist = intersectRayTriangle(_triangles[i].a, _triangles[i].b, _triangles[i].c, r->o, r->d);
                         if(thist < t && thist >= 0){
                             //if(thist >= 0){
@@ -879,8 +868,8 @@ namespace cutracer {
                 int iid = r->id;
 
 
-                if(iid >= imageWidth * imageHeight * SAMPLES_PER_PIXEL) 
-                    printf("IID exceeds total samples.%d\n", iid);
+                //if(iid >= imageWidth * imageHeight * SAMPLES_PER_PIXEL) 
+                //    printf("IID exceeds total samples.%d\n", iid);
 
                 //float4 *fx = &imageData[((y * height + x) * sampleCount + sid)];
                 //CuIntersection *ac_its = &cuConstRendererParams.intersections[((y * imageHeight+ x) * sampleCount + sid)];
@@ -901,7 +890,7 @@ namespace cutracer {
                 if(!direct_light) {
                     // Overwrite the intersection.
                     its.t = t;
-                    its.pt = r->o + r->d * t;
+                    its.pt = (r->o + r->d * t);// + r->n * 1e-4;
                     //its->lightImportance = r->lightImportance;
                     its.light = r->light;
                     its.importance = r->importance;
@@ -919,6 +908,9 @@ namespace cutracer {
                     float bA = length(cross(tri.b - its.pt, tri.c - its.pt)) / total;
                     float bB = length(cross(tri.c - its.pt, tri.a - its.pt)) / total;
                     its.n = bA * tri.n0 + bB * tri.n1 + bC * tri.n2;
+                    its.n = (its.n) * (dot(its.n, r->d) < 0 ? 1 : -1);
+                    
+                    its.pt += its.n * 1e-4;
 
                     // Make 2 more axes.
                     float3 ax = normalize(cross(make_float3(0.1, 0.1, 1), its.n));
@@ -933,6 +925,7 @@ namespace cutracer {
                     its.valid = true;
                 } else {
                     // If direct light estimate, then only estimate the light at this point.
+                    
 
                     its.n = r->n;
                     its.wi = r->wi;
@@ -940,11 +933,16 @@ namespace cutracer {
                     its.sid = r->sid;
                     its.id = r->id;
                     its.importance = r->importance;
-                    its.pt = r->o;
-                    its.t = r->t;
-                    its.light = r->light + ((t < r->maxT) ? (r->lightImportance) : make_float3(0.0)); // TODO: Make update.
-                    its.is_new = 1;
+                    its.pt = r->o;//make_float3(r->maxT, r->maxT, r->maxT);//TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
+                    its.t = r->t; //TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
+                    its.bsdf = tri.bsdf;
+                    its.light = r->light + ((t > r->maxT - 1e-4) ? (r->lightImportance) : make_float3(0.0)); // TODO: Make update.
+                    its.is_new = 2;
                     its.valid = true;
+                    //if(r->id > 30000 && r->id < 30200 && r->valid) {
+                    //    printf("Intersection ID: %d %d\n", its.id, its.is_new);
+                    //}
+                    
                 }
 
                 // write this intersection out.
@@ -1223,7 +1221,8 @@ namespace cutracer {
                 e.dim_x = v2f3(al->dim_x);
                 e.dim_y = v2f3(al->dim_y);
                 e.radiance = make_float3(al->radiance.r, al->radiance.g, al->radiance.b);
-
+                e.area = length(e.dim_x) * length(e.dim_y);
+                std::cout << "Area: " << e.area;
                 //std::vector<CuEmitter> emitters;
                 emitters.push_back(e);
 
@@ -1502,7 +1501,7 @@ namespace cutracer {
 
                 kernelClearIntersections<<<gridDim, blockDim>>>();
             }
-
+            
             void CudaRenderer::render() {
 
                 //printf("Started rendering %d\n", batchSize);fflush(stdout);
@@ -1554,7 +1553,7 @@ namespace cutracer {
                     int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
                     int numBlocks = totalCount / RAYS_PER_BLOCK;
                     //int numBlocks = totalCount / RAYS_PER_BLOCK;
-                    printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
+                    //printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
 
                     dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                     dim3 rayIntersectLevelGridDim(numBlocks, 1);
@@ -1569,23 +1568,78 @@ namespace cutracer {
 
                 //cudaDeviceSynchronize();
                 
-                printf("kernelMergeIntersections\n");
+                //printf("kernelMergeIntersections\n");
                 kernelMergeIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
                 
                 cudaDeviceSynchronize();
                 
-                printf("kernelUpdateSSImage\n");
+                //printf("kernelUpdateSSImage\n");
                 kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
                 
                 cudaDeviceSynchronize();
                 
-                printf("kernelReconstructImage\n");
+                //printf("kernelReconstructImage\n");
                 kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
                 
                 cudaDeviceSynchronize();
 
-                //kernelClearBuffers<<<gridDimCl, blockDimCl>>>((float3*)qPositions, qRadii, (float3*)qColors, queues);
+                kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
+
+                cudaDeviceSynchronize();
+                
+                clearIntersections();
+                
+                cudaDeviceSynchronize();
+                      
+                // BOUNCE TWO (DIRECT LIGHT)
+                
+                int a = 0;
+                for(int i = 0; i < levelCounts.size(); i++)
+                    a += levelCounts[i];
+                
+                printf("Reset counts: %d\n", a);
+                kernelResetCounts<<<1, a>>>();
+
+                cudaDeviceSynchronize();
+
+                kernelRayIntersectSingle<<<rayIntersectGridDim, rayIntersectBlockDim>>>(0);
+
+                cudaDeviceSynchronize();
+
+                // Compute level indices.
+                for(int level = 1; level < levelCounts.size(); level ++) {
+                    //if(level != levelCounts.size() - 1) {
+                    printf("kernelPrintLevelLists DLIGHT %d\n", level);
+                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
+                    cudaDeviceSynchronize();
+                    //}
+                    // for(int level = 1; level < 2; level++) {
+                    int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
+                    int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    //printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
+
+                    dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
+                    dim3 rayIntersectLevelGridDim(numBlocks, 1);
+                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
+                    cudaDeviceSynchronize();
+                }
+
+
                 //cudaDeviceSynchronize();
+
+                //kernelPrintQueueCounts<<<queueCountsGridDim, queueCountsBlockDim>>>();
+
+                //cudaDeviceSynchronize();
+                
+                //printf("kernelMergeIntersections\n");
+                kernelMergeIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
+                
+                cudaDeviceSynchronize();
+                
+                kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
+
+                cudaDeviceSynchronize();
 
                 //double clear = CycleTimer::currentSeconds();
                 //printf("Executing kernel. %d, %d\n", numCircles, NUM_THREADS);
@@ -1633,6 +1687,8 @@ namespace cutracer {
                 //printf("Finished rendering\n");
                 //printf("Done rendering\n");fflush(stdout);
                 //cudaDeviceSynchronize();
+
+                
                 }
 
             }

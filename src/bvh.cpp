@@ -6,8 +6,8 @@
 #include <iostream>
 #include <stack>
 
-#define TREE_BRANCHES 8
-#define DEPTH 3
+#define TREE_BRANCHES 4
+#define DEPTH 2
 
 using namespace std;
 

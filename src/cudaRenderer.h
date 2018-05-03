@@ -50,14 +50,14 @@
 #include "cuda_image.h"
 #include "bvh.h"
 
-#define TREE_WIDTH 8
-#define RAYS_PER_BLOCK 128
-#define RAYS_PER_BLOCK_LOG2 7
+#define TREE_WIDTH 4
+#define RAYS_PER_BLOCK 512
+#define RAYS_PER_BLOCK_LOG2 9
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 10
 #define SAMPLES_PER_PIXEL 4
-#define MAX_TRIANGLES 128
+#define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 4
 
@@ -78,6 +78,9 @@ struct CuRay {
     float3 n;
     float t;
     float3 wi;
+    
+    // Indicates validity of the ray field.
+    bool valid;
 };
 
 struct CuTriangle {
