@@ -78,7 +78,7 @@ struct CuRay {
     float3 n;
     float t;
     float3 wi;
-    
+     
     // Indicates validity of the ray field.
     bool valid;
 };
@@ -135,6 +135,7 @@ struct CuIntersection {
     int id;
     int is_new; // Waiting for the next overwrite.
     bool valid;
+    float sort_t;
 }; 
 
 class CudaRenderer {

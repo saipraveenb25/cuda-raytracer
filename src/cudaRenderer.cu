@@ -450,9 +450,9 @@ namespace cutracer {
         for(int i = 0; i < MAX_INTERSECTIONS; i++) {
             CuIntersection *its = &cuConstRendererParams.multiIntersections[iid * MAX_INTERSECTIONS + i];
             //if(!its->valid) continue;
-            if( its->valid && its->t < t ) {
+            if( its->valid && its->sort_t < t ) {
                 //printf("VALID ITS: %d %f\n", iid, its->t);
-                t = its->t;
+                t = its->sort_t;
                 best = *its;
             }
         }
@@ -890,6 +890,7 @@ namespace cutracer {
                 if(!direct_light) {
                     // Overwrite the intersection.
                     its.t = t;
+                    its.sort_t = t;
                     its.pt = (r->o + r->d * t);// + r->n * 1e-4;
                     //its->lightImportance = r->lightImportance;
                     its.light = r->light;
@@ -935,6 +936,7 @@ namespace cutracer {
                     its.importance = r->importance;
                     its.pt = r->o;//make_float3(r->maxT, r->maxT, r->maxT);//TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
                     its.t = r->t; //TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
+                    its.sort_t = t;
                     its.bsdf = tri.bsdf;
                     its.light = r->light + ((t > r->maxT - 1e-4) ? (r->lightImportance) : make_float3(0.0)); // TODO: Make update.
                     its.is_new = 2;
