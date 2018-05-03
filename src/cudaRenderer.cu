@@ -547,10 +547,10 @@ namespace cutracer {
             int sid = its->sid;
 
             //float4 *fx = &cuConstRendererParams.imageData[((y * height + x) * sampleCount + sid)];
-            //*fx = make_float4(its->light.x, its->light.y, its->light.z, 1.0);
-            *fx = make_float4(its->t / 5.0f, its->t / 5.0f, its->t / 5.0f, 1.0);
+            *fx = make_float4(its->light.x, its->light.y, its->light.z, 1.0);
+            //*fx = make_float4(its->t / 5.0f, its->t / 5.0f, its->t / 5.0f, 1.0);
         } else {
-            *fx = make_float4(1.0, 1.0, 1.0, 1.0);
+            *fx = make_float4(0.0, 0.0, 0.0, 1.0);
         }
         
         
@@ -1574,14 +1574,6 @@ namespace cutracer {
                 cudaDeviceSynchronize();
                 
                 //printf("kernelUpdateSSImage\n");
-                kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
-                
-                cudaDeviceSynchronize();
-                
-                //printf("kernelReconstructImage\n");
-                kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
-                
-                cudaDeviceSynchronize();
 
                 kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
 
@@ -1637,9 +1629,20 @@ namespace cutracer {
                 
                 cudaDeviceSynchronize();
                 
-                kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
-
+                kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
+                
                 cudaDeviceSynchronize();
+                
+                //printf("kernelReconstructImage\n");
+                kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
+                
+                cudaDeviceSynchronize();
+                
+                //kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
+
+                //cudaDeviceSynchronize();
+
+
 
                 //double clear = CycleTimer::currentSeconds();
                 //printf("Executing kernel. %d, %d\n", numCircles, NUM_THREADS);
