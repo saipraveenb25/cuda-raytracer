@@ -98,6 +98,8 @@ class BSDF {
   virtual bool refract(const Vector3D& wo, Vector3D* wi, float ior);
 
   Spectrum rasterize_color;
+
+  int id;
 };  // class BSDF
 
 /**
@@ -112,7 +114,7 @@ class DiffuseBSDF : public BSDF {
   Spectrum get_emission() const { return Spectrum(); }
   bool is_delta() const { return false; }
 
- private:
+ //private:
   Spectrum albedo;
   CosineWeightedHemisphereSampler3D sampler;
 
@@ -132,7 +134,7 @@ class MirrorBSDF : public BSDF {
   Spectrum get_emission() const { return Spectrum(); }
   bool is_delta() const { return true; }
 
- private:
+ //private:
   float roughness;
   Spectrum reflectance;
 

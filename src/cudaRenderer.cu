@@ -403,7 +403,12 @@ namespace cutracer {
         float distToLight = dist;
         float pdf = sqDist / (e->area * abs(cosTheta));
         float fpdf = abs(dot(its->n, r->d))/ pdf;
-        r->lightImportance = its->importance * make_float3(fpdf, fpdf, fpdf) * e->radiance;
+
+
+        CuBSDF *bsdf = &cuConstRendererParams.bsdfs[its->bsdf];
+        
+        
+        r->lightImportance = its->importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e->radiance;
         r->maxT = distToLight;
         r->importance = its->importance;
         r->sid = its->sid;
@@ -415,7 +420,7 @@ namespace cutracer {
         r->wi = its->wi;
         r->t = its->t;
         r->valid = true;
-
+        r->bsdf = its->bsdf;
         /*if(r->id > 30000 && r->id < 30200 && its->valid) {
             printf("INTERSECTION\n");
             printf("d: %f %f %f\n", r->d.x, r->d.y, r->d.z);
@@ -980,7 +985,7 @@ namespace cutracer {
                     its.pt = r->o;//make_float3(r->maxT, r->maxT, r->maxT);//TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
                     its.t = r->t; //TODO: CHANGED CHANGE THIS BACK TODO TODO TODO TODO
                     its.sort_t = t;
-                    its.bsdf = tri.bsdf;
+                    its.bsdf = r->bsdf;
                     its.light = r->light + ((t > r->maxT - 1e-4) ? (r->lightImportance) : make_float3(0.0)); // TODO: Make update.
                     its.is_new = 2;
                     its.valid = true;
@@ -1269,23 +1274,41 @@ namespace cutracer {
                 StaticScene::Scene* scene = dscene->get_static_scene();
 
                 std::vector<StaticScene::Primitive *> primitives;
+                std::vector<BSDF*> _bsdfs;
                 for (StaticScene::SceneObject *obj : scene->objects) {
                     const vector<StaticScene::Primitive *> &obj_prims = obj->get_primitives();
                     primitives.reserve(primitives.size() + obj_prims.size());
                     primitives.insert(primitives.end(), obj_prims.begin(), obj_prims.end());
+                    _bsdfs.push_back(obj->get_bsdf());
+                    
+                    BSDF* _b = obj->get_bsdf();
+
+                    
+                    CuBSDF b;
+
+                    if(!_b->is_delta()){
+                        // Diffuse.
+                        auto _ab = reinterpret_cast<DiffuseBSDF*>(_b);
+                        b.albedo = make_float3(_ab->albedo.r, _ab->albedo.g, _ab->albedo.b);
+                        b.fn = 0;
+                        b.nu = 0;
+                    } else {
+                        // Mirror.
+                        auto _ab = reinterpret_cast<MirrorBSDF*>(_b);
+                        b.albedo = make_float3(_ab->reflectance.r, _ab->reflectance.g, _ab->reflectance.b);
+                        b.fn = 1;
+                        b.nu = 0;
+                    }
+
+                    bsdfs.push_back(b);
                 }
+
 
                 //std::vector<CuTriangle> cuts;
 
                 // Add BSDFs
                 // TODO: Make this automated soon.
                 //std::vector<CuBSDF> bsdfs;
-                CuBSDF b;
-                b.albedo = make_float3(0.6, 0.6, 0.6);
-                b.fn = 0;
-                b.nu = 0;
-
-                bsdfs.push_back(b);
 
                 // Add Emitters
                 // TODO: Make this automated soon.
@@ -1330,9 +1353,19 @@ namespace cutracer {
                     ct.n0 = make_float3(n0.x, n0.y, n0.z);
                     ct.n1 = make_float3(n1.x, n1.y, n1.z);
                     ct.n2 = make_float3(n2.x, n2.y, n2.z);
+                    
+                    auto b = t->get_bsdf();
+                    int bsdf_idx = 0;
+                    for(int i = 0; i < _bsdfs.size(); i++) {
+                        if(b == _bsdfs.at(i)) {
+                            std::cout << "Found a bsdf " << i << "\n";
+                            bsdf_idx = i;
+                            break;
+                        }
+                    }
 
-                    ct.bsdf = 0;
-                    ct.emit = -1; 
+                    ct.bsdf = bsdf_idx;
+                    ct.emit = -1;
 
                     triangles.push_back(ct);
 

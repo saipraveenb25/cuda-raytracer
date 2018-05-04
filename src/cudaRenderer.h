@@ -73,13 +73,13 @@ struct CuRay {
     float maxT; // Maximum length.
     int sid; // Sample ID.
     int id; // Ray ID.
-
+    
     // Copied from CuIntersection. 
     // To allow easy direct light estimation.
     float3 n;
     float t;
     float3 wi;
-     
+    int bsdf;
     // Indicates validity of the ray field.
     bool valid;
 };
