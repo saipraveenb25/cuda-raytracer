@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 
     int benchmarkFrameStart = -1;
     int benchmarkFrameEnd = -1;
-    int imageSize = 128;
+    int imageSize = 32;
     
     if(argc <= 1) {
         usage(argv[0]);
