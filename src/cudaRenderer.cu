@@ -389,8 +389,8 @@ namespace cutracer {
         curandState *rand = &cuConstRendererParams.randomStates[iid];
         float2 sample = squareSample(rand);
         // Generate the sample.
-        float sampleX = sample.x;
-        float sampleY = sample.y;
+        float sampleX = (sample.x - 0.5);
+        float sampleY = (sample.y - 0.5);
 
         
         float3 lpt = e->position + sampleX * e->dim_x + sampleY * e->dim_y;
@@ -833,7 +833,7 @@ namespace cutracer {
                     if((target != (uint64_t)-1) && subindex < numRays) { 
                         int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
                         //cuConstRendererParams.queues[maxRayCount * target + tindex + subindex] = raylist[rayid];
-                        if(wOffset + i * rayCount + tindex + subindex > 2097152) { printf("Illegal access: %d = %d+%d+%d+%d \n", wOffset + i * rayCount + tindex + subindex, wOffset, i * rayCount, tindex, subindex); }
+                        //if(wOffset + i * rayCount + tindex + subindex > 2097152) { printf("Illegal access: %d = %d+%d+%d+%d \n", wOffset + i * rayCount + tindex + subindex, wOffset, i * rayCount, tindex, subindex); }
                         outputQueue[(wOffset + i * rayCount) + tindex + subindex] = raylist[rayid];
                     }
 
