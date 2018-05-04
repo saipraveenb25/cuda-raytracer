@@ -39,6 +39,7 @@ src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o
  /home/sassy/cs618/project/cudascotty/src/meshEdit.h
  /home/sassy/cs618/project/cudascotty/src/ray.h
  /home/sassy/cs618/project/cudascotty/src/sampler.h
+ /home/sassy/cs618/project/cudascotty/src/samplers.cu_inl
  /home/sassy/cs618/project/cudascotty/src/spline.h
  /home/sassy/cs618/project/cudascotty/src/spline.inl
  /home/sassy/cs618/project/cudascotty/src/static_scene/aggregate.h

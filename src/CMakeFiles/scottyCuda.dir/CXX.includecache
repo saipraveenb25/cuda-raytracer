@@ -365,6 +365,10 @@ cuda_runtime.h
 -
 driver_functions.h
 -
+curand.h
+-
+curand_kernel.h
+-
 cuda_image.h
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
 bvh.h

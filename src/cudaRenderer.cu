@@ -13,7 +13,7 @@
 
 #define SCAN_BLOCK_DIM 512  // needed by sharedMemExclusiveScan implementation
 #include "exclusiveScan.cu_inl"
-
+#include "samplers.cu_inl"
 #include "cuda_util.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +123,8 @@ namespace cutracer {
         uint* intersectionTokens;
 
         float* minT;
-
+        
+        curandState* randomStates;
     };
 
     // Global variable that is in scope, but read-only, for all cuda
@@ -308,13 +309,17 @@ namespace cutracer {
 
         //int raycount = cuConstRendererParams.rayCount;
         //printf("x:%d, y:%d\n", imageX, imageY);
+        
+        int id = imageX * height + imageY;
 
         int sampleCount = cuConstRendererParams.sampleCount;
+        curandState rand = cuConstRendererParams.randomStates[0];
 
         for(int i = 0; i < sampleCount; i++) {
             int destIndex = i + (imageX * height + imageY) * sampleCount;
 
-            float2 sample = make_float2(0.5f, 0.5f);
+            //float2 sample = make_float2(0.5f, 0.5f);
+            float2 sample = squareSample(&rand);
 
             float xs = imageX + sample.x;
             float ys = imageY + sample.y;
@@ -349,6 +354,8 @@ namespace cutracer {
             r->valid = true;
         }
 
+        cuConstRendererParams.randomStates[0] = rand;
+
     }
 
     // Generate direct light rays from intersections.
@@ -364,12 +371,10 @@ namespace cutracer {
         
 
         CuEmitter *e = &cuConstRendererParams.emitters[0];
-
-        // Generate the sample.
-        float sampleX = 0.5f;
-        float sampleY = 0.5f;
+        
 
         CuRay *r = &cuConstRendererParams.queues[iid];
+
         if(iid > 30000 && iid < 30200) {
             printf("INTERSECTION: %d %d %d\n", iid, its->valid, r->id);
         }
@@ -378,6 +383,13 @@ namespace cutracer {
             r->valid = false;
             return;
         }
+        
+        curandState *rand = &cuConstRendererParams.randomStates[iid];
+        float2 sample = squareSample(rand);
+        // Generate the sample.
+        float sampleX = sample.x;
+        float sampleY = sample.y;
+
         
         float3 lpt = e->position + sampleX * e->dim_x + sampleY * e->dim_y;
         float3 d =  lpt - its->pt;
@@ -954,6 +966,11 @@ namespace cutracer {
 
             }
 
+            __global__ void kernelSetupRandomSeeds(){
+            	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+            	curand_init(seed, idx, 0, &cuConstRendererParams.randomStates[idx]);
+            }
+
             __global__ void kernelRayIntersectSingle(int snode) {
                 int index = blockDim.x * blockIdx.x + threadIdx.x;
                 //if(index == 0) {
@@ -1375,6 +1392,7 @@ namespace cutracer {
                 cudaMalloc(&deviceMinT, sizeof(float) * numRays);
                 cudaMalloc(&deviceIntersectionTokens, sizeof(uint) * numRays);
                 cudaMalloc(&deviceMultiIntersections, sizeof(CuIntersection) * MAX_INTERSECTIONS * numRays);
+                cudaMalloc(&deviceRandomStates, sizeof(curandState) * numRays);
 
                 //int* hcounts = reinterpret_cast<int*>(calloc((image->width >> KWIDTH) * (image->height >> KWIDTH), sizeof(int)));
 
@@ -1437,6 +1455,7 @@ namespace cutracer {
                 params.minT = deviceMinT;
                 params.multiIntersections = deviceMultiIntersections;
                 params.intersectionTokens = deviceIntersectionTokens;
+                params.randomStates = deviceRandomStates;
 
                 cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants));
 
@@ -1531,6 +1550,11 @@ namespace cutracer {
 
                 dim3 queueCountsBlockDim(400, 1);
                 dim3 queueCountsGridDim(1, 1);
+                
+                kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>();
+                //kernelSetupRandomSeeds<<<1, 1>>>(cuConstRendererParams.randomStates);
+                
+                cudaDeviceSynchronize();
                 //double start = CycleTimer::currentSeconds();
                 kernelPrimaryRays<<<primaryRaysGridDim, primaryRaysBlockDim>>>();
 

@@ -45,7 +45,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
-
+#include <curand.h>
+#include <curand_kernel.h>
 
 #include "cuda_image.h"
 #include "bvh.h"
@@ -159,6 +160,7 @@ private:
     float* deviceMinT;
     uint* deviceIntersectionTokens;
     CuIntersection* deviceMultiIntersections;
+    curandState_t* deviceRandomStates;
 
     // Host structures.
     std::vector<CuBSDF> bsdfs;
@@ -167,7 +169,6 @@ private:
     std::vector<CuBVHSubTree> subtrees;
     int* levelIndices;
     std::vector<int> levelCounts;
-    
     
     // Camera data.
     Vector3D c_origin;

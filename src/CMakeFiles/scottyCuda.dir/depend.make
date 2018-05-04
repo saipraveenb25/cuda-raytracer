@@ -38,6 +38,7 @@ src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/intersection.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/meshEdit.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/ray.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/sampler.h
+src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/samplers.cu_inl
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/spline.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/spline.inl
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/static_scene/aggregate.h

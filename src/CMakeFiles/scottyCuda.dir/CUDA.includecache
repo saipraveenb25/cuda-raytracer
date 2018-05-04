@@ -125,6 +125,8 @@ cuda_image.h
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
 exclusiveScan.cu_inl
 /home/sassy/cs618/project/cudascotty/src/exclusiveScan.cu_inl
+samplers.cu_inl
+/home/sassy/cs618/project/cudascotty/src/samplers.cu_inl
 cuda_util.h
 /home/sassy/cs618/project/cudascotty/src/cuda_util.h
 
@@ -192,6 +194,10 @@ cuda.h
 cuda_runtime.h
 -
 driver_functions.h
+-
+curand.h
+-
+curand_kernel.h
 -
 cuda_image.h
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
@@ -401,6 +407,18 @@ CMU462/vector3D.h
 /home/sassy/cs618/project/cudascotty/src/CMU462/vector3D.h
 CMU462/misc.h
 /home/sassy/cs618/project/cudascotty/src/CMU462/misc.h
+
+/home/sassy/cs618/project/cudascotty/src/samplers.cu_inl
+stdio.h
+-
+curand.h
+-
+curand_kernel.h
+-
+math.h
+-
+assert.h
+-
 
 /home/sassy/cs618/project/cudascotty/src/spline.h
 map
