@@ -482,6 +482,7 @@ namespace cutracer {
 
 #define BSDF_DIFFUSE_MULTIPLIER 1.0
     // Generate secondary rays from the given intersections.
+    // #intproc
     __global__ void kernelProcessIntersections( ) {
 
         // For each element in intersection.
@@ -498,51 +499,68 @@ namespace cutracer {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
         CuRay *r = &cuConstRendererParams.queues1[0];
-        if(!its->is_new) {
-            // This intersection slot is stale. Ignore
+
+        if(!its->valid) {
+            // This intersection slot is stale/wrong. Ignore
             return;
         }
 
         // Compute a random sample. Hemispherical Random Sample.
-        float sampleX;
-        float sampleY;
-        float sampleZ;
 
         float3 n = its->n;
-        float3 dpdu; //TODO:Compute;
-        float3 dpdv; //TODO:Compute;
 
-        float dX = n.x * sampleZ + sampleX * dpdu.x + sampleY * dpdv.x;
-        float dY = n.y * sampleZ + sampleX * dpdu.y + sampleY * dpdv.y;
-        float dZ = n.z * sampleZ + sampleX * dpdu.z + sampleY * dpdv.z;
-
-        float3 d = make_float3(dX, dY, dZ);
-        float3 o = its->pt;
-        r->d = d;
-        r->o = o;
-
+        float3 guide = (its->n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+        float3 dpdu = normalize(cross(guide, n)); 
+        float3 dpdv = normalize(cross(dpdu, n)); 
+        
         int bsdfID = its->bsdf;
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[bsdfID];
 
+        // BSDF-independent parameter assignments.
+        r->maxT = INFINITY;
+        r->sid = its->sid;
+        r->id = its->id;
+        r->valid = true;
+        r->ss = its->ss;
+        r->lightImportance = make_float3(0, 0, 0); // Not a direct lighting estimate.
+        r->light = its->light; // No light accumulation at this step.
+        
+        // For standard BSDFs this is fine.
+        // For BSSRDFs, move this into the BSDF-specific loops.
+        r->o = its->pt + its->n * 1e-4;
+
+        // BSDF specifics;
         if(bsdf->fn == 0) {
-            r->importance = its->importance * dot(r->d, its->n) * bsdf->albedo * BSDF_DIFFUSE_MULTIPLIER; // TODO: Compute with BSDF.
-            r->light = its->light;
-            r->lightImportance = make_float3(0, 0, 0);
-            r->maxT = INFINITY;
-            r->sid = its->sid;
-            r->id = its->id;
+            // Diffuse BSDF.
+
+            float3 sample = sphericalSample(&cuConstRendererParams.randomStates[iid]);
+            float sampleX = sample.x;
+            float sampleY = sample.y;
+            float sampleZ = (sample.z < 0) ? -sample.z : sample.z;
+            
+            float dX = n.x * sampleZ + sampleX * dpdu.x + sampleY * dpdv.x;
+            float dY = n.y * sampleZ + sampleX * dpdu.y + sampleY * dpdv.y;
+            float dZ = n.z * sampleZ + sampleX * dpdu.z + sampleY * dpdv.z;
+
+            float3 d = make_float3(dX, dY, dZ);
+
+            r->d = d;
+            r->importance = its->importance * abs(dot(r->d, its->n)) * bsdf->albedo * BSDF_DIFFUSE_MULTIPLIER; // TODO: Compute with BSDF.
+
         } else if(bsdf->fn == 1){
-            // TODO: Implement specular stuff.
-            r->importance = its->importance * dot(r->d, its->n); // TODO: Compute with BSDF.
-            r->light = its->light;
-            r->lightImportance = make_float3(0, 0, 0);
-            r->maxT = INFINITY;
-            r->sid = its->sid;
-            r->id = its->id;
+            
+            // Mirror BSDF.
+
+            float3 wo = make_float3(-wi.x, -wi.y, wi.z); // Reflected ray.
+
+            float dX = n.x * wo.z + wo.x * dpdu.x + wo.y * dpdv.x;
+            float dY = n.y * wo.z + wo.x * dpdu.y + wo.y * dpdv.y;
+            float dZ = n.z * wo.z + wo.x * dpdu.z + wo.y * dpdu.z;
+            
+            r->d = make_float3(dX, dY, dZ);
+            r->importance = its->importance * bsdf->albedo * BSDF_SPECULAR_MULTIPLIER; // Specular importance sample.
         }
 
-        // Reset new bit so that we don't confuse intersections at a later stage.
-        its->is_new = 0;
     }
 
     __global__ void kernelUpdateSSImage( ) {
@@ -961,10 +979,15 @@ namespace cutracer {
                     
                     its.pt += its.n * 1e-4;
 
+                    float3 guide = (its->n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+                    float3 dpdu = normalize(cross(guide, n)); 
+                    float3 dpdv = normalize(cross(dpdu, n)); 
+                    
                     // Make 2 more axes.
-                    float3 ax = normalize(cross(make_float3(0.1, 0.1, 1), its.n));
-                    float3 ay = normalize(cross(ax, its.n));
-                    its.wi = normalize(make_float3(dot(ax, r->d), dot(ay, r->d), dot(its.n, r->d)));
+                    //float3 ax = normalize(cross(make_float3(0.1, 0.1, 1), its.n));
+                    //float3 ay = normalize(cross(ax, its.n));
+
+                    its.wi = normalize(make_float3(dot(dpdu, -r->d), dot(dpdv, -r->d), dot(its.n, -r->d)));
 
                     its.ss = r->ss;
                     its.sid = r->sid;
