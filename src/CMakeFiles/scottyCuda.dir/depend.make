@@ -18,6 +18,7 @@ src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/cudaRenderer.cu
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/cudaRenderer.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/cuda_image.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/cuda_util.h
+src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/cycleTimer.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/dynamic_scene/ambient_light.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/dynamic_scene/area_light.h
 src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o: src/dynamic_scene/directional_light.h
@@ -305,6 +306,7 @@ src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/collada/sphere_info.h
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/cudaMain.cpp
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/cudaRenderer.h
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/cuda_image.h
+src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/cycleTimer.h
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/dynamic_scene/ambient_light.h
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/dynamic_scene/area_light.h
 src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o: src/dynamic_scene/directional_light.h

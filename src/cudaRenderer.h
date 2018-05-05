@@ -50,6 +50,7 @@
 
 #include "cuda_image.h"
 #include "bvh.h"
+#include "cycleTimer.h"
 
 #define TREE_WIDTH 4
 #define RAYS_PER_BLOCK 512
@@ -57,11 +58,15 @@
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 10
-#define SAMPLES_PER_PIXEL 8
+#define SAMPLES_PER_PIXEL 16
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
-#define MAX_INTERSECTIONS 4
+#define MAX_INTERSECTIONS 12
 #define IMAGE_SIZE 256
+#define RAY_DEBUG_INDEX 2120
+
+#undef DEBUG_RAYS
+#undef DEBUG_SPECIFIC_RAY
 
 namespace cutracer {
 struct CuRay {
@@ -83,6 +88,11 @@ struct CuRay {
     int bsdf;
     // Indicates validity of the ray field.
     bool valid;
+    bool lightray; // true if it's used for lighting estimate.
+
+    // Debugging info.
+    int pathtype;
+    int depth;
 };
 
 struct CuTriangle {
@@ -141,6 +151,8 @@ struct CuIntersection {
     int is_new; // Waiting for the next overwrite.
     bool valid;
     float sort_t;
+    int pathtype; // Path type Eg. SS or SD or DS.
+    int depth;
 }; 
 
 class CudaRenderer {
@@ -221,6 +233,9 @@ public:
     void processSceneBounce(int num);
 
     void processDirectLightBounce(int num);
+
+    void startTimer(double* start);
+    void lapTimer(double* start, double* end, std::string info);
 };
 
 }

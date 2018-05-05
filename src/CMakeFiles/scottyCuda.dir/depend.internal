@@ -19,6 +19,7 @@ src/CMakeFiles/scottyCuda.dir/cudaRenderer.cu.o
  /home/sassy/cs618/project/cudascotty/src/cudaRenderer.h
  /home/sassy/cs618/project/cudascotty/src/cuda_image.h
  /home/sassy/cs618/project/cudascotty/src/cuda_util.h
+ /home/sassy/cs618/project/cudascotty/src/cycleTimer.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/ambient_light.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/area_light.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/directional_light.h
@@ -306,6 +307,7 @@ src/CMakeFiles/scottyCuda.dir/cudaMain.cpp.o
  /home/sassy/cs618/project/cudascotty/src/cudaMain.cpp
  /home/sassy/cs618/project/cudascotty/src/cudaRenderer.h
  /home/sassy/cs618/project/cudascotty/src/cuda_image.h
+ /home/sassy/cs618/project/cudascotty/src/cycleTimer.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/ambient_light.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/area_light.h
  /home/sassy/cs618/project/cudascotty/src/dynamic_scene/directional_light.h

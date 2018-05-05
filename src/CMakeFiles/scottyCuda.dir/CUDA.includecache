@@ -203,6 +203,8 @@ cuda_image.h
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
 bvh.h
 /home/sassy/cs618/project/cudascotty/src/bvh.h
+cycleTimer.h
+/home/sassy/cs618/project/cudascotty/src/cycleTimer.h
 
 /home/sassy/cs618/project/cudascotty/src/cuda_image.h
 
@@ -210,6 +212,30 @@ bvh.h
 cuda_runtime.h
 /home/sassy/cs618/project/cudascotty/src/cuda_runtime.h
 math.h
+-
+
+/home/sassy/cs618/project/cudascotty/src/cycleTimer.h
+sys/sysctl.h
+-
+mach/mach.h
+-
+mach/mach_time.h
+-
+stdio.h
+-
+stdlib.h
+-
+windows.h
+-
+time.h
+-
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+sys/time.h
 -
 
 /home/sassy/cs618/project/cudascotty/src/dynamic_scene/ambient_light.h
