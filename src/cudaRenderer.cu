@@ -127,6 +127,8 @@ namespace cutracer {
         float* minT;
         
         curandState* randomStates;
+
+        uint* blockOffsets;
     };
 
     // Global variable that is in scope, but read-only, for all cuda
@@ -440,7 +442,7 @@ namespace cutracer {
     __global__ void kernelPrintLevelLists(int level, int total) {
         for(int i = 0; i < total; i++) {
             int nidx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + i];
-            printf("%d->%d\n", nidx, cuConstRendererParams.qCounts[nidx]);
+            printf("%d->%d=>%d\n", nidx, cuConstRendererParams.qCounts[nidx], cuConstRendererParams.blockOffsets[i]);
         }
     }
 
@@ -1051,25 +1053,33 @@ namespace cutracer {
             __global__ void kernelPrintQueueCounts() {
                 //printf("%u->%u\n", threadIdx.x, cuConstRendererParams.qCounts[threadIdx.x]);
             }
-
+            
+            // #scancount #countscan #scan
             __global__ void kernelScanCounts(int level) {
                 int idx = threadIdx.x;
                 __shared__ uint inputCounts[512];
+                __shared__ uint inputBlockCounts[512];
                 __shared__ uint outputCounts[512];
+                __shared__ uint outputBlockCounts[512];
                 __shared__ uint spare[1024];
                 
                 int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
                 inputCounts[idx] = cuConstRendererParams.qCounts[nodeIdx];
+                inputBlockCounts[idx] = (inputCounts[idx] >> RAYS_PER_BLOCK_LOG2) + 1;
+
                 __syncthreads();
                 sharedMemExclusiveScan(idx, &inputCounts[0], &outputCounts[0], &spare[0], 512);
                 __syncthreads();
+                sharedMemExclusiveScan(idx, &inputBlockCounts[0], &outputBlockCounts[0], &spare[0], 512);
+                __syncthreads();
 
-                cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for all branches (worst-case)
+                cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
+                cuConstRendererParams.blockOffsets[idx] = outputBlockCounts[idx] + inputBlockCounts[idx]; // Inclusive scan.
             }
 
             // Intersection function.
             // Performs ray intersection on a full level.
-            __global__ void kernelRayIntersectLevel(int level) {
+            __global__ void kernelRayIntersectLevel(int level, int limit) {
                 // Mapping: Each block takes a subset of rays split for that level.
                 // Use blockID bits to split the rays to each snode in the level.
                 // Each block only works on one particular snode.
@@ -1093,11 +1103,33 @@ namespace cutracer {
                 int imageWidth = cuConstRendererParams.imageWidth;
                 int imageHeight = cuConstRendererParams.imageHeight;
                 int sampleCount = cuConstRendererParams.sampleCount;
+                
+                __shared__ int levelIndex;
+                __shared__ uint rayBaseIndex;
+                
+                if(threadIdx.x < 1)
+                    levelIndex = -1;
 
-                int levelIndex = (blockIdx.x * blockDim.x) / (imageWidth * imageHeight * sampleCount);
+                __syncthreads();
+                
+                
+                if(threadIdx.x < limit) {
+                    uint lo = (threadIdx.x == 0) ? 0 : cuConstRendererParams.blockOffsets[threadIdx.x - 1];
+                    uint hi = cuConstRendererParams.blockOffsets[threadIdx.x];
+                    
+                    if(blockIdx.x >= lo && blockIdx.x < hi) {
+                        levelIndex = threadIdx.x;
+                        rayBaseIndex = (blockIdx.x - lo) * RAYS_PER_BLOCK;
+                    }
+                }
+
+                __syncthreads();
+
+                //int levelIndex = (blockIdx.x * blockDim.x) / (imageWidth * imageHeight * sampleCount);
 
                 int nodeIndex = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + levelIndex];
-                int rayIndex = (blockIdx.x * blockDim.x + threadIdx.x) % (imageWidth * imageHeight * sampleCount);
+                int rayIndex = rayBaseIndex + threadIdx.x;
+                
                 
 
                 //if(rayIndex == 0){
@@ -1106,15 +1138,16 @@ namespace cutracer {
                 //if(level < 4) { 
                 int rayCount = cuConstRendererParams.qCounts[nodeIndex];
 
-                __shared__ bool active;
+                //__shared__ bool active;
 
-                if(threadIdx.x == 0) {
-                    active = (rayIndex <= rayCount);
-                }
+                //if(threadIdx.x == 0) {
+                //    active = (rayIndex <= rayCount);
+                //}
+                
                 
                 __syncthreads();
                 
-                if (active) {
+                if (levelIndex != -1) {
                     if(level % 2 == 0) {
                         rayIntersectSingle(nodeIndex, rayIndex, cuConstRendererParams.queues1, cuConstRendererParams.queues2);
                     } else {
@@ -1503,7 +1536,7 @@ namespace cutracer {
                 //numCircles = 1024;
 
                 int numRays = SAMPLES_PER_PIXEL * image->width * image->height;
-                int queueSize = numRays * TREE_WIDTH * 8;
+                queueSize = numRays * TREE_WIDTH * 8;
                 
                 std::cout << "Queue Size: " << queueSize << std::endl;
                 std::cout << "\nDevice Allocation \n";
@@ -1559,6 +1592,8 @@ namespace cutracer {
                 ok = cudaMalloc(&deviceIntersectionTokens, sizeof(uint) * numRays);
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
                 ok = cudaMalloc(&deviceMultiIntersections, sizeof(CuIntersection) * MAX_INTERSECTIONS * numRays);
+                if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
+                ok = cudaMalloc(&deviceBlockOffsets, sizeof(uint) * 1024);
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
 
                 //cudaMalloc(&deviceQueueOffsets1, sizeof(uint) * subtrees.size());
@@ -1636,6 +1671,7 @@ namespace cutracer {
                 params.multiIntersections = deviceMultiIntersections;
                 params.intersectionTokens = deviceIntersectionTokens;
                 params.randomStates = deviceRandomStates;
+                params.blockOffsets = deviceBlockOffsets;
 
                 ok = cudaMemcpyToSymbol(cuConstRendererParams, &params, sizeof(GlobalConstants));
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
@@ -1729,12 +1765,10 @@ namespace cutracer {
 
             void CudaRenderer::processLevel(int level) {
                     
-                    printf("kernelPrintLevelLists\n");
-                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
-                    cudaDeviceSynchronize();
                     //}
                     // for(int level = 1; level < 2; level++) {
-                    int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
+                    //int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
+                    int totalCount = queueSize;
                     int numBlocks = totalCount / RAYS_PER_BLOCK;
                     //int numBlocks = totalCount / RAYS_PER_BLOCK;
                     printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
@@ -1742,10 +1776,14 @@ namespace cutracer {
                     kernelScanCounts<<<1,levelCounts[level]>>>(level);
                     
                     cudaDeviceSynchronize();
+                    
+                    printf("kernelPrintLevelLists\n");
+                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
+                    cudaDeviceSynchronize();
 
                     dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                     dim3 rayIntersectLevelGridDim(numBlocks, 1);
-                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
+                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level, levelCounts[level]);
                     
                     cudaDeviceSynchronize();
                 
@@ -1888,24 +1926,24 @@ namespace cutracer {
                 // Compute level indices.
                 for(int level = 1; level < levelCounts.size(); level ++) {
                     //if(level != levelCounts.size() - 1) {
+                    //}
+                    // for(int level = 1; level < 2; level++) {
+                    int totalCount = queueSize;
+                    int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    printf("kernelIntersectLevel: %d, %d, %d, %d\n", queueSize, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width);  
+                    
+                    kernelScanCounts<<<1,levelCounts[level]>>>(level);
+                    
+                    cudaDeviceSynchronize();
+                    
                     printf("kernelPrintLevelLists\n");
                     kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
                     cudaDeviceSynchronize();
-                    //}
-                    // for(int level = 1; level < 2; level++) {
-                    int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
-                    int numBlocks = totalCount / RAYS_PER_BLOCK;
-                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
-                    printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
-                    
-                    
-                    kernelScanCounts<<<1,levelCounts[level]>>>(level);
-                    
-                    cudaDeviceSynchronize();
 
                     dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                     dim3 rayIntersectLevelGridDim(numBlocks, 1);
-                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
+                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level, levelCounts[level]);
                     cudaDeviceSynchronize();
 
                 }
@@ -1920,79 +1958,12 @@ namespace cutracer {
                 kernelMergeIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
                 
                 cudaDeviceSynchronize();
-                
-                //printf("kernelUpdateSSImage\n");
 
-                kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
-
-                cudaDeviceSynchronize();
-                
-                clearIntersections();
-
-                
-                cudaDeviceSynchronize();
-                      
-                // BOUNCE TWO (DIRECT LIGHT) 
-                
-                printf("Reset counts: %d\n", a);
-                kernelResetCounts<<<1, a>>>();
-
-                cudaDeviceSynchronize();
-                
-                kernelScanCounts<<<1,levelCounts[0]>>>(0);
-
-                cudaDeviceSynchronize();
-
-                kernelRayIntersectSingle<<<rayIntersectGridDim, rayIntersectBlockDim>>>(0);
-
-                cudaDeviceSynchronize();
-
-                // Compute level indices.
-                for(int level = 1; level < levelCounts.size(); level ++) {
-                    //if(level != levelCounts.size() - 1) {
-                    printf("kernelPrintLevelLists DLIGHT %d\n", level);
-                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
-                    cudaDeviceSynchronize();
-                    //}
-                    // for(int level = 1; level < 2; level++) {
-                    int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
-                    int numBlocks = totalCount / RAYS_PER_BLOCK;
-                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
-                    printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
-                    
-                    kernelScanCounts<<<1,levelCounts[level]>>>(level);
-                    
-                    cudaDeviceSynchronize();
-
-                    dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
-                    dim3 rayIntersectLevelGridDim(numBlocks, 1);
-                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
-                    cudaDeviceSynchronize();
-                }
-
-
-                //cudaDeviceSynchronize();
-
-                //kernelPrintQueueCounts<<<queueCountsGridDim, queueCountsBlockDim>>>();
-
-                //cudaDeviceSynchronize();
-                
-                //printf("kernelMergeIntersections\n");
-                kernelMergeIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
-                
-                cudaDeviceSynchronize();
+                processDirectLightBounce(0);
                 
                 processSceneBounce(1);
 
                 processDirectLightBounce(1);
-                /*kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
-                 
-                cudaDeviceSynchronize();
-                
-                //printf("kernelReconstructImage\n");
-                kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
-                
-                cudaDeviceSynchronize();*/
                 
                 
                 kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();

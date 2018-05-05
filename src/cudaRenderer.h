@@ -166,6 +166,7 @@ private:
     uint* deviceIntersectionTokens;
     CuIntersection* deviceMultiIntersections;
     curandState_t* deviceRandomStates;
+    uint* deviceBlockOffsets;
     uint* queueOffsets1;
     uint* queueOffsets2;
 
@@ -182,7 +183,8 @@ private:
     Vector3D c_lookAt;
     Vector3D c_up;
     Vector3D c_left;
-
+    
+    size_t queueSize;
 public:
 
     CudaRenderer();
