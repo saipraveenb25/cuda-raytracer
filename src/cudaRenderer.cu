@@ -361,6 +361,7 @@ namespace cutracer {
     }
 
     // Generate direct light rays from intersections.
+    // #direct #lighting
     __global__ void kernelDirectLightRays() {
         // For each element in intersection. (Map each intersection to a thread).
         // For each light
@@ -480,7 +481,8 @@ namespace cutracer {
             cuConstRendererParams.intersections[iid] = best;
     }
 
-#define BSDF_DIFFUSE_MULTIPLIER 1.0
+#define BSDF_DIFFUSE_MULTIPLIER 0.3183
+#define BSDF_SPECULAR_MULTIPLIER 1.0
     // Generate secondary rays from the given intersections.
     // #intproc
     __global__ void kernelProcessIntersections( ) {
@@ -498,7 +500,7 @@ namespace cutracer {
 
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
-        CuRay *r = &cuConstRendererParams.queues1[0];
+        CuRay *r = &cuConstRendererParams.queues1[iid];
 
         if(!its->valid) {
             // This intersection slot is stale/wrong. Ignore
@@ -509,7 +511,7 @@ namespace cutracer {
 
         float3 n = its->n;
 
-        float3 guide = (its->n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+        float3 guide = (n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
         float3 dpdu = normalize(cross(guide, n)); 
         float3 dpdv = normalize(cross(dpdu, n)); 
         
@@ -527,7 +529,7 @@ namespace cutracer {
         
         // For standard BSDFs this is fine.
         // For BSSRDFs, move this into the BSDF-specific loops.
-        r->o = its->pt + its->n * 1e-4;
+        r->o = its->pt;
 
         // BSDF specifics;
         if(bsdf->fn == 0) {
@@ -537,12 +539,16 @@ namespace cutracer {
             float sampleX = sample.x;
             float sampleY = sample.y;
             float sampleZ = (sample.z < 0) ? -sample.z : sample.z;
+
+            //float sampleX = 0.2;
+            //float sampleY = 0.2;
+            //float sampleZ = 0.5;
             
             float dX = n.x * sampleZ + sampleX * dpdu.x + sampleY * dpdv.x;
             float dY = n.y * sampleZ + sampleX * dpdu.y + sampleY * dpdv.y;
             float dZ = n.z * sampleZ + sampleX * dpdu.z + sampleY * dpdv.z;
 
-            float3 d = make_float3(dX, dY, dZ);
+            float3 d = normalize(make_float3(dX, dY, dZ));
 
             r->d = d;
             r->importance = its->importance * abs(dot(r->d, its->n)) * bsdf->albedo * BSDF_DIFFUSE_MULTIPLIER; // TODO: Compute with BSDF.
@@ -550,7 +556,7 @@ namespace cutracer {
         } else if(bsdf->fn == 1){
             
             // Mirror BSDF.
-
+            float3 wi = its->wi;
             float3 wo = make_float3(-wi.x, -wi.y, wi.z); // Reflected ray.
 
             float dX = n.x * wo.z + wo.x * dpdu.x + wo.y * dpdv.x;
@@ -560,6 +566,10 @@ namespace cutracer {
             r->d = make_float3(dX, dY, dZ);
             r->importance = its->importance * bsdf->albedo * BSDF_SPECULAR_MULTIPLIER; // Specular importance sample.
         }
+        
+        //if(r->id > 500 && r->id < 600 && its->valid) {
+        //    printf("ITSID: %d ID: %d BSDF: %d SS: %f %f o: %f %f %f wi: %f %f %f pt: %f %f %f t: %f d: %f %f %f dpdu: %f %f %f its n: %f %f %f importance: %f %f %f NEW: %d\n", its->id, r->id, bsdf->fn, r->ss.x, r->ss.y, r->o.x, r->o.y, r->o.z, its->wi.x, its->wi.y, its->wi.z, its->pt.x, its->pt.y, its->pt.z, its->t, r->d.x, r->d.y, r->d.z, dpdu.x, dpdu.y, dpdu.z, its->n.x, its->n.y, its->n.z, r->importance.x, r->importance.y, r->importance.z, its->is_new);
+        //}
 
     }
 
@@ -979,9 +989,9 @@ namespace cutracer {
                     
                     its.pt += its.n * 1e-4;
 
-                    float3 guide = (its->n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
-                    float3 dpdu = normalize(cross(guide, n)); 
-                    float3 dpdv = normalize(cross(dpdu, n)); 
+                    float3 guide = (its.n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
+                    float3 dpdu = normalize(cross(guide, its.n)); 
+                    float3 dpdv = normalize(cross(dpdu, its.n)); 
                     
                     // Make 2 more axes.
                     //float3 ax = normalize(cross(make_float3(0.1, 0.1, 1), its.n));
@@ -1493,7 +1503,7 @@ namespace cutracer {
                 //numCircles = 1024;
 
                 int numRays = SAMPLES_PER_PIXEL * image->width * image->height;
-                int queueSize = numRays * TREE_WIDTH * 2;
+                int queueSize = numRays * TREE_WIDTH * 8;
                 
                 std::cout << "Queue Size: " << queueSize << std::endl;
                 std::cout << "\nDevice Allocation \n";
@@ -1694,6 +1704,54 @@ namespace cutracer {
                 kernelClearIntersections<<<gridDim, blockDim>>>();
             }
             
+            void CudaRenderer::resetRayState() {
+            
+                clearIntersections();
+                
+                cudaDeviceSynchronize();
+                      
+                // BOUNCE TWO (DIRECT LIGHT) 
+                
+                int a = 0;
+                for(int i = 0; i < levelCounts.size(); i++)
+                    a += levelCounts[i];
+                
+                printf("Reset counts: %d\n", a);
+                kernelResetCounts<<<1, a>>>();
+
+                cudaDeviceSynchronize();
+                
+                kernelScanCounts<<<1,levelCounts[0]>>>(0);
+
+                cudaDeviceSynchronize();
+
+            }
+
+            void CudaRenderer::processLevel(int level) {
+                    
+                    printf("kernelPrintLevelLists\n");
+                    kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
+                    cudaDeviceSynchronize();
+                    //}
+                    // for(int level = 1; level < 2; level++) {
+                    int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
+                    int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    //int numBlocks = totalCount / RAYS_PER_BLOCK;
+                    printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
+                    
+                    kernelScanCounts<<<1,levelCounts[level]>>>(level);
+                    
+                    cudaDeviceSynchronize();
+
+                    dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
+                    dim3 rayIntersectLevelGridDim(numBlocks, 1);
+                    kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level);
+                    
+                    cudaDeviceSynchronize();
+                
+            }
+
+
             void CudaRenderer::render() {
 
                 //printf("Started rendering %d\n", batchSize);fflush(stdout);
@@ -1848,6 +1906,37 @@ namespace cutracer {
                 
                 cudaDeviceSynchronize();
                 
+                /*kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
+                
+                cudaDeviceSynchronize();
+                
+                //printf("kernelReconstructImage\n");
+                kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
+                
+                cudaDeviceSynchronize();*/
+                
+                printf("kernelProcessIntersections\n");
+                kernelProcessIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
+
+                cudaDeviceSynchronize();
+                
+                resetRayState();
+
+                cudaDeviceSynchronize();
+
+                kernelRayIntersectSingle<<<rayIntersectGridDim, rayIntersectBlockDim>>>(0);
+
+                cudaDeviceSynchronize();
+
+                // Compute level indices.
+                for(int level = 1; level < levelCounts.size(); level ++) 
+                    processLevel(level);
+                
+
+                kernelMergeIntersections<<<intersectionGridDim, intersectionBlockDim>>>();
+                
+                cudaDeviceSynchronize();
+                
                 kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
                 
                 cudaDeviceSynchronize();
@@ -1856,16 +1945,8 @@ namespace cutracer {
                 kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
                 
                 cudaDeviceSynchronize();
-                
-                //kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
-
-                //cudaDeviceSynchronize();
 
 
-
-                //cudaDeviceSynchronize();
-
-                
                 }
 
             }

@@ -57,7 +57,7 @@
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 10
-#define SAMPLES_PER_PIXEL 16
+#define SAMPLES_PER_PIXEL 1
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 4
@@ -210,6 +210,10 @@ public:
         float* pixelData);
     
     DynamicScene::Scene* loadFromSceneInfo(Collada::SceneInfo* sceneInfo);
+
+    void resetRayState();
+
+    void processLevel(int level);
 };
 
 }
