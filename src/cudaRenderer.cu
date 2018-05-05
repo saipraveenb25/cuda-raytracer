@@ -1835,14 +1835,15 @@ namespace cutracer {
             void CudaRenderer::resetRayState() {
 
                 clearIntersections();
-
-                cudaDeviceSynchronize();
-
-                // BOUNCE TWO (DIRECT LIGHT) 
-
+                
                 int a = 0;
                 for(int i = 0; i < levelCounts.size(); i++)
                     a += levelCounts[i];
+
+                //cudaDeviceSynchronize();
+
+                // BOUNCE TWO (DIRECT LIGHT) 
+
 
                 printf("Reset counts: %d\n", a);
                 kernelResetCounts<<<1, a>>>();
@@ -1975,7 +1976,7 @@ namespace cutracer {
             kernelRayIntersectSingle<<<rayIntersectGridDim, rayIntersectBlockDim>>>(0);
 
             cudaDeviceSynchronize();
-            lapTimer(&start, &end, "Reset Ray State");
+            lapTimer(&start, &end, "Ray Intersect Single");
 
             // Iteratively process each level of the BVH.
             for(int level = 1; level < levelCounts.size(); level ++) 
