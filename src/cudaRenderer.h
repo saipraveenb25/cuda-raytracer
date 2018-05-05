@@ -57,10 +57,11 @@
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 10
-#define SAMPLES_PER_PIXEL 1
+#define SAMPLES_PER_PIXEL 8
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 4
+#define IMAGE_SIZE 256
 
 namespace cutracer {
 struct CuRay {
@@ -214,6 +215,10 @@ public:
     void resetRayState();
 
     void processLevel(int level);
+
+    void processSceneBounce(int num);
+
+    void processDirectLightBounce(int num);
 };
 
 }
