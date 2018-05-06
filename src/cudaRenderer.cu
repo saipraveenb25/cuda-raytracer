@@ -264,6 +264,9 @@ namespace cutracer {
         return t; // this ray hits the triangle 
     }
 
+#define BSDF_DIFFUSE_MULTIPLIER 0.3183
+#define BSDF_SPECULAR_MULTIPLIER 1.0
+
     __global__ void kernelClearBuffers(float3* positions, float* radii, float3* colors, int* queues) {
         //int idx = threadIdx.x;
         //int block = blockIdx.x;
@@ -369,7 +372,7 @@ namespace cutracer {
 
     // Generate direct light rays from intersections.
     // #direct #lighting
-    __global__ void kernelDirectLightRays() {
+    __global__ void kernelDirectLightRays( float weight ) {
         // For each element in intersection. (Map each intersection to a thread).
         // For each light
         // Create a ray from light to intersection.
@@ -423,8 +426,8 @@ namespace cutracer {
 
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[_its.bsdf];
 
-        if(bsdf->fn == 0) {
-            _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e.radiance;
+        if(bsdf->fn == 0 && dist > 1e-2 && abs(cosTheta) > 1e-2) {
+            _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e.radiance * BSDF_DIFFUSE_MULTIPLIER * weight;
         } else {
             _r.lightImportance = make_float3(0.0f);
         }
@@ -525,8 +528,6 @@ namespace cutracer {
             cuConstRendererParams.intersections[iid] = *best;
     }
 
-#define BSDF_DIFFUSE_MULTIPLIER 0.3183
-#define BSDF_SPECULAR_MULTIPLIER 1.0
     // Generate secondary rays from the given intersections.
     // #intproc
     __global__ void kernelProcessIntersections( ) {
@@ -1299,17 +1300,18 @@ namespace cutracer {
 
                 for(int i = 0; i < repeat; i++) {
                     int idx = threadIdx.x + i * RAYS_PER_BLOCK;
-                    int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
+                    //int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
                     if(idx < limit) {
                         //cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
                         //printf("Scanning: BLock offset: (%d)%d[%d]->%d+%d\n", idx, nodeIdx, inputCounts[idx], outputBlockCounts[idx], inputBlockCounts[idx]);
                         cuConstRendererParams.blockOffsets[idx] = outputCounts[idx] + inputCounts[idx]; // Inclusive scan.
-                        //if(idx == limit - 1) {
-                        //    maxBlocks = cuConstRendererParams.blockOffsets[idx];
-                        //}
                     }
                 }
-
+                
+                __syncthreads();
+                if(threadIdx.x == 0) {
+                    maxBlocks = cuConstRendererParams.blockOffsets[limit - 1];
+                }
             }
 
             // Intersection function.
@@ -1457,7 +1459,7 @@ namespace cutracer {
                                                             c_dir = (transform * Vector4D(c->view_dir, 1)).to3D().unit();
                                                             std::cout << "Camera parameters: " << std::endl;
                                                             this->c_lookAt = -c_dir;
-                                                            this->c_origin = c_pos + Vector3D(0, 0.5, 0);
+                                                            this->c_origin = c_pos + Vector3D(0, 0.75, 0);
                                                             Vector3D acup(0.0f, 1.0f, 0.0f);
                                                             this->c_left = cross(acup, c_dir).unit();
                                                             this->c_up = cross(this->c_left, c_dir).unit();
@@ -2023,14 +2025,8 @@ namespace cutracer {
                 //}
                 // for(int level = 1; level < 2; level++) {
                 //int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
-                int totalCount = queueSize;
-                int numBlocks = totalCount / RAYS_PER_BLOCK;
-                
-                int stride = 128;
-                int blockTiles = (numBlocks / stride) + 1;
                 //dim3 rayIntersectGridDim(blockTiles, stride);
                 //int numBlocks = totalCount / RAYS_PER_BLOCK;
-                printf("kernelIntersectLevel: %d, %d, %d, %d TILES: %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width, blockTiles); 
 
                 //if(levelCounts[level] > RAYS_PER_BLOCK) {
                 //    printf("Assertion failed levelCounts[%d] < RAYS_PER_BLOCK ", level);
@@ -2048,6 +2044,27 @@ namespace cutracer {
                 cudaDeviceSynchronize();
                 lapTimer(&start, &end, "Print Level Lists");
 #endif
+                
+                int _maxblocks;
+                auto ok = cudaMemcpyFromSymbol(&_maxblocks, maxBlocks, sizeof(int), 0, cudaMemcpyDeviceToHost);
+                /*if(ok != cudaSuccess) {
+                    printf("Error transferring symbol 'maxBlocks' : %d, ", ok);
+                    if(ok == cudaErrorInvalidValue) printf("Invalid value\n");
+                    if(ok == cudaErrorInvalidSymbol) printf("Invalid symbol\n");
+                    if(ok == cudaErrorInvalidDevicePointer) printf("Invalid DEvice pointer\n");
+                    if(ok == cudaErrorInvalidMemcpyDirection) printf("Memcpy invalid direction\n");
+                    exit(1);
+                }*/
+                //int totalCount = queueSize;
+                //int numBlocks = totalCount / RAYS_PER_BLOCK;
+                int numBlocks = _maxblocks + 1;
+                
+                int stride = static_cast<int>(sqrt(static_cast<float>(numBlocks)));
+                int blockTiles = (numBlocks / stride) + 1;
+                
+                //printf("_maxblocks: %d\n", _maxblocks);
+                printf("kernelIntersectLevel: %d, %d, %d TILES: %d MAXBLOCKS: %d\n", numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width, blockTiles, _maxblocks); 
+                lapTimer(&start, &end, "Max block count transfer");
 
                 dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                 dim3 rayIntersectLevelGridDim(blockTiles, stride);
@@ -2125,7 +2142,7 @@ namespace cutracer {
             lapTimer(&start, &end, "Merge Intersections");
         }
 
-        void CudaRenderer::processDirectLightBounce( int num = -1 ) {
+        void CudaRenderer::processDirectLightBounce( int num = -1, float weight = 1.0 ) {
 
             int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
             dim3 intersectionBlockDim(1024, 1);
@@ -2138,7 +2155,7 @@ namespace cutracer {
                 printf("---------------------------------------------DIRECT LIGHT BOUNCE %d-----------------------------------------------\n", num);
 
             printf("kernelDirectLight\n");
-            kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>();
+            kernelDirectLightRays<<<intersectionGridDim, intersectionBlockDim>>>(weight);
 
             cudaDeviceSynchronize();
 
@@ -2297,20 +2314,29 @@ namespace cutracer {
             
             lapTimer(&start, &end, "Primary Ray Intersect");
             
-            processDirectLightBounce(0);
+            processDirectLightBounce(0, 0.5);
             lapTimer(&start, &end, "Direct Light Bounce 0");
+            
+            processDirectLightBounce(1, 0.5);
+            lapTimer(&start, &end, "Direct Light Bounce 0-1");
 
             processSceneBounce(1);
             lapTimer(&start, &end, "Scene Bounce 1");
 
-            processDirectLightBounce(1);
-            lapTimer(&start, &end, "Direct Light Bounce 1");
+            processDirectLightBounce(11, 0.5);
+            lapTimer(&start, &end, "Direct Light Bounce 1-1");
+            
+            processDirectLightBounce(12, 0.5);
+            lapTimer(&start, &end, "Direct Light Bounce 1-2");
 
             processSceneBounce(2);
             lapTimer(&start, &end, "Scene Bounce 2");
 
-            processDirectLightBounce(2);
-            lapTimer(&start, &end, "Direct Light Bounce 2");
+            processDirectLightBounce(21);
+            lapTimer(&start, &end, "Direct Light Bounce 2-1");
+            
+            //processDirectLightBounce(22);
+            //lapTimer(&start, &end, "Direct Light Bounce 2-2");
             
             //processSceneBounce(3);
             //lapTimer(&start, &end, "Scene Bounce 2");
