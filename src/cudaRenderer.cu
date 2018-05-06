@@ -1164,31 +1164,6 @@ namespace cutracer {
             // Intersection function.
             // Performs ray intersection on a full level.
             __global__ void kernelRayIntersectLevel(int level, int limit) {
-                // Mapping: Each block takes a subset of rays split for that level.
-                // Use blockID bits to split the rays to each snode in the level.
-                // Each block only works on one particular snode.
-
-                // Each thread takes one ray.
-
-                // Combined load of the data for the snode to shared memory.
-
-                // Test all 16 child node BBoxes against every ray.
-
-                // If hit:
-                // (TODO) Add to the queue for that outlet.
-
-                // If miss:
-                // Leave it.
-
-                // Use a table to compute the nodes at this level.
-
-                // Compute the queue index.
-                //int levelIndex = (blockIdx.x * blockDim.x) >> QUEUE_LENGTH_LOG2;
-
-                //int imageWidth = cuConstRendererParams.imageWidth;
-                //int imageHeight = cuConstRendererParams.imageHeight;
-                //int sampleCount = cuConstRendererParams.sampleCount;
-
                 __shared__ int levelIndex;
                 __shared__ uint rayBaseIndex;
 
@@ -1197,29 +1172,26 @@ namespace cutracer {
 
                 __syncthreads();
 
+                 
+                int repeat = (limit >> RAYS_PER_BLOCK_LOG2) + 1;  // Used to handle 
+                for(int i = 0; i < repeat; i++) {
+                    int cidx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    if(cidx < limit) {
+                        uint lo = (cidx == 0) ? 0 : cuConstRendererParams.blockOffsets[cidx - 1];
+                        uint hi = cuConstRendererParams.blockOffsets[cidx];
 
-                if(threadIdx.x < limit) {
-                    uint lo = (threadIdx.x == 0) ? 0 : cuConstRendererParams.blockOffsets[threadIdx.x - 1];
-                    uint hi = cuConstRendererParams.blockOffsets[threadIdx.x];
-
-                    if(blockIdx.x >= lo && blockIdx.x < hi) {
-                        levelIndex = threadIdx.x;
-                        rayBaseIndex = (blockIdx.x - lo) * RAYS_PER_BLOCK;
+                        if(blockIdx.x >= lo && blockIdx.x < hi) {
+                            levelIndex = cidx;
+                            rayBaseIndex = (blockIdx.x - lo) * RAYS_PER_BLOCK;
+                        }
                     }
                 }
 
                 __syncthreads();
 
-                //if(level == 2 && threadIdx.x == 0 && levelIndex != -1) {
-                //.printf("Block: %d -> %d %d\n", blockIdx.x, levelIndex, rayBaseIndex);
-                //}
-
-                //int levelIndex = (blockIdx.x * blockDim.x) / (imageWidth * imageHeight * sampleCount);
 
                 int nodeIndex = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + levelIndex];
                 int rayIndex = rayBaseIndex + threadIdx.x;
-
-
 
                 //if(rayIndex == 0){
                 //    printf("At %d\n", nodeIndex);
