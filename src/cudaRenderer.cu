@@ -2277,7 +2277,7 @@ namespace cutracer {
             //processSceneBounce(3);
             //lapTimer(&start, &end, "Scene Bounce 2");
 
-            //processDirectLightBounce(2);
+            //processDirectLightBounce(3);
             //lapTimer(&start, &end, "Direct Light Bounce 2");
 
             kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
