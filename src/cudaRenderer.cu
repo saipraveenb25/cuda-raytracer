@@ -379,9 +379,11 @@ namespace cutracer {
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
         
 
-        CuEmitter *e = &cuConstRendererParams.emitters[0];
-        //__shared__ CuEmitter e;
-
+        __shared__ CuEmitter e;
+        if(threadIdx.x < 1) {
+            e = cuConstRendererParams.emitters[0];
+        }
+        __syncthreads();
 
         CuRay *r = &cuConstRendererParams.queues1[iid];
 
@@ -405,22 +407,22 @@ namespace cutracer {
         float sampleY = (sample.y - 0.5);
 
 
-        float3 lpt = e->position + sampleX * e->dim_x + sampleY * e->dim_y;
+        float3 lpt = e.position + sampleX * e.dim_x + sampleY * e.dim_y;
         float3 d =  lpt - _its.pt;
-        float cosTheta = dot(d, e->direction);
+        float cosTheta = dot(d, e.direction);
         float sqDist = dot(d,d);
         float dist = sqrt(sqDist);
         _r.d = d / dist;
         _r.o = _its.pt;
         float distToLight = dist;
-        float pdf = sqDist / ((e->area) * abs(cosTheta));
+        float pdf = sqDist / ((e.area) * abs(cosTheta));
         float fpdf = abs(dot(_its.n, _r.d))/ pdf;
 
 
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[_its.bsdf];
 
         if(bsdf->fn == 0) {
-            _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e->radiance;
+            _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e.radiance;
         } else {
             _r.lightImportance = make_float3(0.0f);
         }
