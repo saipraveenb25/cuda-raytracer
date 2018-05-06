@@ -53,8 +53,9 @@
 #include "cycleTimer.h"
 
 #define TREE_WIDTH 4
-#define RAYS_PER_BLOCK 512
-#define RAYS_PER_BLOCK_LOG2 9
+#define RAYS_PER_BLOCK 256
+#define RAYS_PER_BLOCK_LOG2 8
+
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 12

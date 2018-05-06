@@ -11,7 +11,7 @@
 //#include "util.h"
 //#include "cycleTimer.h"
 
-#define SCAN_BLOCK_DIM 512  // needed by sharedMemExclusiveScan implementation
+#define SCAN_BLOCK_DIM 256  // needed by sharedMemExclusiveScan implementation
 #include "exclusiveScan.cu_inl"
 #include "samplers.cu_inl"
 #include "cuda_util.h"
@@ -837,7 +837,7 @@ namespace cutracer {
             __shared__ uint _outlets[TREE_WIDTH * RAYS_PER_BLOCK];
             __shared__  uint _c_outlets[TREE_WIDTH * RAYS_PER_BLOCK];
             //__shared__ uint _compacter[TREE_WIDTH * RAYS_PER_BLOCK];
-            __shared__ uint _c_qid[2 * TREE_WIDTH * RAYS_PER_BLOCK];
+            __shared__ uint _c_qid[2 * RAYS_PER_BLOCK];
             //__shared__ uint _scratch[TREE_WIDTH * RAYS_PER_BLOCK];
             //if(index == 0)
             //    printf("STREE: %d, %d\n", is_leaf, index);
@@ -2028,7 +2028,7 @@ namespace cutracer {
                 
                 int stride = 128;
                 int blockTiles = (numBlocks / stride) + 1;
-                dim3 rayIntersectGridDim(blockTiles, stride);
+                //dim3 rayIntersectGridDim(blockTiles, stride);
                 //int numBlocks = totalCount / RAYS_PER_BLOCK;
                 printf("kernelIntersectLevel: %d, %d, %d, %d TILES: %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width, blockTiles); 
 
@@ -2046,11 +2046,14 @@ namespace cutracer {
                 printf("kernelPrintLevelLists\n");
                 kernelPrintLevelLists<<<1,1>>>(level, levelCounts[level]);
                 cudaDeviceSynchronize();
-
+                lapTimer(&start, &end, "Print Level Lists");
 #endif
 
                 dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
                 dim3 rayIntersectLevelGridDim(blockTiles, stride);
+                //dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
+                //dim3 rayIntersectLevelGridDim(numBlocks, 1);
+                
                 kernelRayIntersectLevel<<<rayIntersectLevelGridDim, rayIntersectLevelBlockDim>>>(level, levelCounts[level]);
 
                 cudaDeviceSynchronize();
