@@ -915,8 +915,8 @@ namespace cutracer {
                 //if(subtree.outlets[i] == (uint64_t)-1) continue;
 
                 sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[i * 2 * RAYS_PER_BLOCK], RAYS_PER_BLOCK);
+                __syncthreads();
             }
-            __syncthreads();
 
             /*if(subindex == 0) {
               if(_c_outlets[RAYS_PER_BLOCK - 1] % 4 != 0) {
