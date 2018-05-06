@@ -685,6 +685,12 @@ namespace cutracer {
 
 
     }
+    
+    //#accumulate
+    __global__ void kernelAccumulate( int oldWeight, int newWeight ) { 
+        int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        cuConstRendererParams.finalImageData[idx] = ( cuConstRendererParams.finalImageData[idx] * oldWeight + cuConstRendererParams.imageData[idx] * newWeight ) / (oldWeight + newWeight);
+    }
 
     // Intersection functions
     // Performs ray intersect on a single node.
@@ -2214,6 +2220,7 @@ namespace cutracer {
             kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
 
             cudaDeviceSynchronize();
+
             lapTimer(&start, &end, "Build Image");
 
 
