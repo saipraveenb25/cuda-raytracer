@@ -915,7 +915,37 @@ namespace cutracer {
                 //if(subtree.outlets[i] == (uint64_t)-1) continue;
 
                 sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[0], RAYS_PER_BLOCK);
+                
                 __syncthreads();
+                
+                //if(subindex >= RAYS_PER_BLOCK) 
+                //    continue;
+
+                uint64_t target = subtree.outlets[i];
+                int numRays = _c_outlets[(i+1) * RAYS_PER_BLOCK - 1] + _outlets[(i+1) * RAYS_PER_BLOCK - 1];
+                if(subindex == 0 && (target != (uint64_t)-1)){
+                    tindex = atomicAdd(&cuConstRendererParams.qCounts[target], numRays);
+                }
+                
+                __syncthreads();
+                int off = (wOffset + i * rayCount) + tindex;
+
+                uint k0 = _c_outlets[i * RAYS_PER_BLOCK + subindex + 0];
+                uint k1 = _c_outlets[i * RAYS_PER_BLOCK + subindex + 1]; 
+                //printf("%d,%d->%d,%d - %d\n", i, subindex, k0, k1, _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]);
+                if(subindex != RAYS_PER_BLOCK - 1) {
+                    if((k0 + 1) == k1) {
+                        //_c_qid[i * RAYS_PER_BLOCK + k0] = index;
+                        outputQueue[off + k0] = raylist[index];
+                        //printf("%d->%d\n", k0, index);
+                    }
+                } else {
+                    if(_outlets[i * RAYS_PER_BLOCK + subindex])
+                        outputQueue[off + k0] = raylist[index];
+                        //_c_qid[i * RAYS_PER_BLOCK + k0] = index;
+                }
+
+                //__syncthreads();
             }
 
             /*if(subindex == 0) {
@@ -932,22 +962,7 @@ namespace cutracer {
             }*/
             //return;
             // Rearrange.
-            for(int i = 0; i < TREE_WIDTH; i++) {
-                if(subindex >= RAYS_PER_BLOCK) 
-                    continue;
-
-                uint k0 = _c_outlets[i * RAYS_PER_BLOCK + subindex + 0];
-                uint k1 = _c_outlets[i * RAYS_PER_BLOCK + subindex + 1]; 
-                //printf("%d,%d->%d,%d - %d\n", i, subindex, k0, k1, _c_outlets[(i+1) * RAYS_PER_BLOCK - 1]);
-                if(subindex != RAYS_PER_BLOCK - 1) {
-                    if((k0 + 1) == k1) {
-                        _c_qid[i * RAYS_PER_BLOCK + k0] = index;
-                        //printf("%d->%d\n", k0, index);
-                    }
-                } else {
-                    if(_outlets[i * RAYS_PER_BLOCK + subindex])
-                        _c_qid[i * RAYS_PER_BLOCK + k0] = index;
-                }
+            /*for(int i = 0; i < TREE_WIDTH; i++) {
             }
 
             __syncthreads();
@@ -976,7 +991,7 @@ namespace cutracer {
                 //}
 
                 //int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
-                //if(raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id == 450000 && /*raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id < 480000 &&*/ (target != (uint64_t)-1) && (subindex < numRays)){
+                //if(raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id == 450000 && raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id < 480000 && (target != (uint64_t)-1) && (subindex < numRays)){*/
                 #ifdef DEBUG_SPECIFIC_RAY
                 /*if(raylist[rayid].id == RAY_DEBUG_INDEX && (subindex < numRays) && (target != (uint64_t) -1) ){
                     //subtree.
@@ -995,7 +1010,7 @@ namespace cutracer {
                 //__syncthreads();
 
 
-            }
+            //}
 
         } else {
 
