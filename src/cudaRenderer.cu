@@ -914,7 +914,7 @@ namespace cutracer {
             for(int i = 0; i < TREE_WIDTH; i++) {
                 //if(subtree.outlets[i] == (uint64_t)-1) continue;
 
-                sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[i * 2 * RAYS_PER_BLOCK], RAYS_PER_BLOCK);
+                sharedMemExclusiveScan(subindex, &_outlets[i * RAYS_PER_BLOCK], &_c_outlets[i * RAYS_PER_BLOCK], &_c_qid[0], RAYS_PER_BLOCK);
                 __syncthreads();
             }
 
@@ -975,10 +975,10 @@ namespace cutracer {
                 //}
                 //}
 
-                int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
+                //int rayid = _c_qid[i * RAYS_PER_BLOCK + subindex];
                 //if(raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id == 450000 && /*raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id < 480000 &&*/ (target != (uint64_t)-1) && (subindex < numRays)){
                 #ifdef DEBUG_SPECIFIC_RAY
-                if(raylist[rayid].id == RAY_DEBUG_INDEX && (subindex < numRays) && (target != (uint64_t) -1) ){
+                /*if(raylist[rayid].id == RAY_DEBUG_INDEX && (subindex < numRays) && (target != (uint64_t) -1) ){
                     //subtree.
                     CuBVHSubTree subtree = cuConstRendererParams.bvhSubTrees[snode];
                     float t = intersectBBox(raylist[rayid].o, raylist[rayid].d, subtree.minl[i], subtree.maxl[i]);
@@ -989,7 +989,7 @@ namespace cutracer {
 
                     //printf("tindex: %lu, %d, %lu, %f\n", maxRayCount * target, tindex + subindex, maxRayCount * target + tindex + subindex, t);
                     //printf("Ntest: %f\n\n", t);
-                }
+                }*/
                 #endif
 
                 //__syncthreads();
