@@ -138,6 +138,7 @@ namespace cutracer {
     // about this type of memory in class, but constant memory is a fast
     // place to put read-only variables).
     __constant__ GlobalConstants cuConstRendererParams;
+    __device__ int maxBlocks;
 
     __device__ __inline__ void cudaswap(float& a, float& b) {
         float temp = a;
@@ -379,11 +380,12 @@ namespace cutracer {
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
         
 
-        __shared__ CuEmitter e;
-        if(threadIdx.x < 1) {
-            e = cuConstRendererParams.emitters[0];
-        }
-        __syncthreads();
+        //__shared__ CuEmitter e;
+        CuEmitter e = cuConstRendererParams.emitters[0];
+        //if(threadIdx.x < 1) {
+        //    e = cuConstRendererParams.emitters[0];
+        //}
+        //__syncthreads();
 
         CuRay *r = &cuConstRendererParams.queues1[iid];
 
@@ -727,6 +729,7 @@ namespace cutracer {
         cuConstRendererParams.finalImageData[idx] = ( cuConstRendererParams.finalImageData[idx] * oldWeight + cuConstRendererParams.imageData[idx] * newWeight ) / (oldWeight + newWeight);
     }
 
+
     // Intersection functions
     // Performs ray intersect on a single node.
     __device__ void rayIntersectSingle(int snode, int index, CuRay* inputQueue, CuRay* outputQueue) {
@@ -818,6 +821,7 @@ namespace cutracer {
         //outputOffsets[linearIndex] = ;
 
         CuRay *r = &inputQueue[rOffset + index];
+        CuRay _r = *r;
         CuRay *raylist = &inputQueue[rOffset];
 
         //if(r->id == 528) {
@@ -839,7 +843,7 @@ namespace cutracer {
             //    printf("STREE: %d, %d\n", is_leaf, index);
             //int subindex = index % (RAYS_PER_BLOCK);
 
-            float minT = cuConstRendererParams.minT[r->id];
+            float minT = cuConstRendererParams.minT[_r.id];
             /*if(index == 2100) {
               printf("SubTree: Start->%lu\n", subtree.start);
               printf("SubTree: Range->%lu\n", subtree.range);
@@ -866,13 +870,14 @@ namespace cutracer {
                     // Intersect the rays here.
                     if(subtree.outlets[i] == (uint64_t)-1) continue;
 
-                    float t = intersectBBox(r->o, r->d, subtree.minl[i], subtree.maxl[i]);
+                    float t = intersectBBox(_r.o, _r.d, subtree.minl[i], subtree.maxl[i]);
 
                     if( t >= 0 && t <= minT ) {
                         // If intersected, place a mark.
                         _outlets[i * RAYS_PER_BLOCK + subindex] = 1;
+                        
                         #ifdef DEBUG_SPECIFIC_RAY
-                        if(r->id == RAY_DEBUG_INDEX) {
+                        if(_r.id == RAY_DEBUG_INDEX) {
                             //printf("OUTLET[%d]=%lu\n", i, subtree.outlets[i]);
                             printf("INTERSECT-BBOX: %d->%lu INDEX: %d/%d, r->o:%f %f %f r->d: %f %f %f minl: %f %f %f max %f %f %f t: %f lightray: %d\n\n", snode, subtree.outlets[i], index, rayCount, r->o.x, r->o.y, r->o.z, r->d.x, r->d.y, r->d.z, subtree.minl[i].x, subtree.minl[i].y, subtree.minl[i].z, subtree.maxl[i].x, subtree.maxl[i].y, subtree.maxl[i].z, t, r->lightray);
                         }
@@ -1227,6 +1232,8 @@ namespace cutracer {
                     tempAcc[0] = 0;
                     for(int i = 0; i < repeat - 1; i++)
                         tempAcc[i + 1] = tempAcc[i] + outputCounts[(i+1) * RAYS_PER_BLOCK - 1] + inputCounts[(i + 1) * RAYS_PER_BLOCK - 1];
+
+                    
                 }
                 
                 __syncthreads();
@@ -1282,6 +1289,9 @@ namespace cutracer {
                         //cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
                         //printf("Scanning: BLock offset: (%d)%d[%d]->%d+%d\n", idx, nodeIdx, inputCounts[idx], outputBlockCounts[idx], inputBlockCounts[idx]);
                         cuConstRendererParams.blockOffsets[idx] = outputCounts[idx] + inputCounts[idx]; // Inclusive scan.
+                        //if(idx == limit - 1) {
+                        //    maxBlocks = cuConstRendererParams.blockOffsets[idx];
+                        //}
                     }
                 }
 
@@ -1298,7 +1308,8 @@ namespace cutracer {
 
                 __syncthreads();
 
-                 
+                int blockIndex = gridDim.y * blockIdx.x + blockIdx.y;
+
                 int repeat = (limit >> RAYS_PER_BLOCK_LOG2) + 1;  // Used to handle 
                 for(int i = 0; i < repeat; i++) {
                     int cidx = threadIdx.x + i * RAYS_PER_BLOCK;
@@ -1306,9 +1317,9 @@ namespace cutracer {
                         uint lo = (cidx == 0) ? 0 : cuConstRendererParams.blockOffsets[cidx - 1];
                         uint hi = cuConstRendererParams.blockOffsets[cidx];
 
-                        if(blockIdx.x >= lo && blockIdx.x < hi) {
+                        if(blockIndex >= lo && blockIndex < hi) {
                             levelIndex = cidx;
-                            rayBaseIndex = (blockIdx.x - lo) * RAYS_PER_BLOCK;
+                            rayBaseIndex = (blockIndex - lo) * RAYS_PER_BLOCK;
                         }
                     }
                 }
@@ -1999,8 +2010,12 @@ namespace cutracer {
                 //int totalCount = image->height * image->width * SAMPLES_PER_PIXEL * levelCounts[level];
                 int totalCount = queueSize;
                 int numBlocks = totalCount / RAYS_PER_BLOCK;
+                
+                int stride = 128;
+                int blockTiles = (numBlocks / stride) + 1;
+                dim3 rayIntersectGridDim(blockTiles, stride);
                 //int numBlocks = totalCount / RAYS_PER_BLOCK;
-                printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
+                printf("kernelIntersectLevel: %d, %d, %d, %d TILES: %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width, blockTiles); 
 
                 //if(levelCounts[level] > RAYS_PER_BLOCK) {
                 //    printf("Assertion failed levelCounts[%d] < RAYS_PER_BLOCK ", level);
@@ -2020,8 +2035,8 @@ namespace cutracer {
 #endif
 
                 dim3 rayIntersectLevelBlockDim(RAYS_PER_BLOCK, 1);
-                dim3 rayIntersectLevelGridDim(numBlocks, 1);
-                kernelRayIntersectLevel<<<numBlocks, RAYS_PER_BLOCK>>>(level, levelCounts[level]);
+                dim3 rayIntersectLevelGridDim(blockTiles, stride);
+                kernelRayIntersectLevel<<<rayIntersectLevelGridDim, rayIntersectLevelBlockDim>>>(level, levelCounts[level]);
 
                 cudaDeviceSynchronize();
                 lapTimer(&start, &end, "Intersect Level");
@@ -2224,6 +2239,9 @@ namespace cutracer {
 
             int blocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / RAYS_PER_BLOCK;
             dim3 rayIntersectBlockDim(RAYS_PER_BLOCK, 1);
+
+            //int stride = 32;
+            //int blockTiles = (blocksPerNode / stride) + 1;
             dim3 rayIntersectGridDim(blocksPerNode, 1);
 
             int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
