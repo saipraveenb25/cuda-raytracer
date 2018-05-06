@@ -57,16 +57,19 @@
 #define RAYS_PER_BLOCK_LOG2 9
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
-#define MAX_LEVELS 10
-#define SAMPLES_PER_PIXEL 4
+#define MAX_LEVELS 12
+#define SAMPLES_PER_PIXEL 16
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 6
-#define IMAGE_SIZE 512
-#define RAY_DEBUG_INDEX 2120
+#define IMAGE_SIZE 256
+#define MAX_NODES_PER_LEVEL 4096
+#define MAX_NODE_BLOCKS 32
 
 #undef DEBUG_RAYS
 #undef DEBUG_SPECIFIC_RAY
+#define BOUNDS_CHECK
+#define RAY_DEBUG_INDEX 2120
 
 namespace cutracer {
 struct CuRay {
@@ -233,6 +236,8 @@ public:
     void processSceneBounce(int num);
 
     void processDirectLightBounce(int num);
+    
+    void resetCounts();
 
     void startTimer(double* start);
     void lapTimer(double* start, double* end, std::string info);

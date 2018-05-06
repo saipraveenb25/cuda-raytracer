@@ -668,18 +668,20 @@ namespace cutracer {
         cuConstRendererParams.imageData[idx] = color;
     }
 
-    __global__ void kernelResetCounts( ) {
+    __global__ void kernelResetCounts( int limit ) {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
         int width = cuConstRendererParams.imageWidth;
         int height = cuConstRendererParams.imageHeight;
         int sampleCount = cuConstRendererParams.sampleCount;
 
         int totalRays = width * height * sampleCount;
-
-        if(idx == 0)
-            cuConstRendererParams.qCounts[idx] = totalRays;
-        else
-            cuConstRendererParams.qCounts[idx] = 0;
+        
+        if(idx < limit) {
+            if(idx == 0)
+                cuConstRendererParams.qCounts[idx] = totalRays;
+            else
+                cuConstRendererParams.qCounts[idx] = 0;
+        }
 
 
     }
@@ -766,6 +768,7 @@ namespace cutracer {
             }
         } 
 
+        
 
         __syncthreads();
 
@@ -1134,31 +1137,113 @@ namespace cutracer {
 
             // #scancount #countscan #scan
             __global__ void kernelScanCounts(int level, int limit) {
-                int idx = threadIdx.x;
-                __shared__ uint inputCounts[512];
-                __shared__ uint inputBlockCounts[512];
-                __shared__ uint outputCounts[512];
-                __shared__ uint outputBlockCounts[512];
-                __shared__ uint spare[1024];
+                __shared__ uint inputCounts[MAX_NODES_PER_LEVEL];
+                //__shared__ uint inputBlockCounts[MAX_NODES_PER_LEVEL];
+                __shared__ uint outputCounts[MAX_NODES_PER_LEVEL];
+                //__shared__ uint outputBlockCounts[MAX_NODES_PER_LEVEL];
+                __shared__ uint spare[RAYS_PER_BLOCK * 2];
 
-                int nodeIdx = -1;
-                if(idx < limit) {
-                    nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
-                    inputCounts[idx] = cuConstRendererParams.qCounts[nodeIdx];
-                    inputBlockCounts[idx] = (inputCounts[idx] >> RAYS_PER_BLOCK_LOG2) + 1;
+                __shared__ uint tempAcc[MAX_NODE_BLOCKS];
+
+                int repeat = (limit >> RAYS_PER_BLOCK_LOG2) + 1;
+                
+                #ifdef BOUNDS_CHECK
+                    if(limit > MAX_NODES_PER_LEVEL) {
+                        printf("[BOUNDS ERROR] Limt > MAX_NODES_PER_LEVEL, %d\n", limit);
+                        asm("trap;");
+                    }
+
+                    if(repeat > MAX_NODE_BLOCKS) {
+                        printf("[BOUNDS ERROR] MAX_NODE_BLOCKS < repeat(%d)\n", repeat);
+                        asm("trap;");
+                    }
+
+                    if(RAYS_PER_BLOCK > 1024) {
+                        printf("[BOUNDS ERROR] RAYS_PER_BLOCK(%d) > 1024", RAYS_PER_BLOCK);
+                        asm("trap;");
+                    }
+
+                    if(blockDim.x != RAYS_PER_BLOCK) {
+                        printf("[ASSERT ERROR] blockDim.x != RAYS_PER_BLOCK", RAYS_PER_BLOCK);
+                        asm("trap;");
+                    }
+                #endif
+
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    if(idx < limit) {
+                        int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
+                        inputCounts[idx] = cuConstRendererParams.qCounts[nodeIdx];
+                    }
+                }
+                __syncthreads();
+                for(int i = 0; i < repeat; i++) {
+                    sharedMemExclusiveScan(threadIdx.x, &inputCounts[i * RAYS_PER_BLOCK], &outputCounts[i * RAYS_PER_BLOCK], &spare[0], RAYS_PER_BLOCK);
+                    __syncthreads();
+                }
+
+                if(threadIdx.x < 1) {
+                    tempAcc[0] = 0;
+                    for(int i = 0; i < repeat - 1; i++)
+                        tempAcc[i + 1] = tempAcc[i] + outputCounts[(i+1) * RAYS_PER_BLOCK - 1] + inputCounts[(i + 1) * RAYS_PER_BLOCK - 1];
+                }
+                
+                __syncthreads();
+                
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    outputCounts[idx] += tempAcc[i];
                 }
 
                 __syncthreads();
-                sharedMemExclusiveScan(idx, &inputCounts[0], &outputCounts[0], &spare[0], 512);
-                __syncthreads();
-                sharedMemExclusiveScan(idx, &inputBlockCounts[0], &outputBlockCounts[0], &spare[0], 512);
-                __syncthreads();
 
-                if(idx < limit) {
-                    cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
-                    cuConstRendererParams.blockOffsets[idx] = outputBlockCounts[idx] + inputBlockCounts[idx]; // Inclusive scan.
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
+                    if(idx < limit) {
+                        cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
                     //printf("Scanning: BLock offset: (%d)%d[%d]->%d+%d\n", idx, nodeIdx, inputCounts[idx], outputBlockCounts[idx], inputBlockCounts[idx]);
+                    }
                 }
+
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    if(idx < limit) {
+                        int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
+                        inputCounts[idx] = (cuConstRendererParams.qCounts[nodeIdx] >> RAYS_PER_BLOCK_LOG2) + 1;
+                    }
+                }
+                __syncthreads();
+                for(int i = 0; i < repeat; i++) {
+                    sharedMemExclusiveScan(threadIdx.x, &inputCounts[i * RAYS_PER_BLOCK], &outputCounts[i * RAYS_PER_BLOCK], &spare[0], RAYS_PER_BLOCK);
+                    __syncthreads();
+                }
+                
+                if(threadIdx.x < 1) {
+                    tempAcc[0] = 0;
+                    for(int i = 0; i < repeat - 1; i++)
+                        tempAcc[i + 1] = tempAcc[i] + outputCounts[(i+1) * RAYS_PER_BLOCK - 1] + inputCounts[(i + 1) * RAYS_PER_BLOCK - 1];
+                }
+                
+                __syncthreads();
+                
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    outputCounts[idx] += tempAcc[i];
+                }
+
+                __syncthreads();
+
+                for(int i = 0; i < repeat; i++) {
+                    int idx = threadIdx.x + i * RAYS_PER_BLOCK;
+                    int nodeIdx = cuConstRendererParams.levelIndices[level * LEVEL_INDEX_SIZE + idx];
+                    if(idx < limit) {
+                        //cuConstRendererParams.bvhSubTrees[nodeIdx].wOffset = outputCounts[idx] * TREE_WIDTH; // Provide space for aln branches (worst-case)
+                        //printf("Scanning: BLock offset: (%d)%d[%d]->%d+%d\n", idx, nodeIdx, inputCounts[idx], outputBlockCounts[idx], inputBlockCounts[idx]);
+                        cuConstRendererParams.blockOffsets[idx] = outputCounts[idx] + inputCounts[idx]; // Inclusive scan.
+                    }
+                }
+
             }
 
             // Intersection function.
@@ -1804,10 +1889,7 @@ namespace cutracer {
                 kernelClearIntersections<<<gridDim, blockDim>>>();
             }
 
-            void CudaRenderer::resetRayState() {
-
-                clearIntersections();
-                
+            void CudaRenderer::resetCounts() {
                 int a = 0;
                 for(int i = 0; i < levelCounts.size(); i++)
                     a += levelCounts[i];
@@ -1818,9 +1900,21 @@ namespace cutracer {
 
 
                 printf("Reset counts: %d\n", a);
-                kernelResetCounts<<<1, a>>>();
+                if(a <= RAYS_PER_BLOCK) {
+                    kernelResetCounts<<<1, a>>>(a);
+                } else {
+                    kernelResetCounts<<<(a/RAYS_PER_BLOCK)+1, RAYS_PER_BLOCK>>>(a);
+                }
 
                 cudaDeviceSynchronize();
+            
+            }
+
+            void CudaRenderer::resetRayState() {
+
+                clearIntersections();
+                
+                resetCounts();
 
                 kernelScanCounts<<<1,RAYS_PER_BLOCK>>>(0, levelCounts[0]);
 
@@ -1840,10 +1934,10 @@ namespace cutracer {
                 //int numBlocks = totalCount / RAYS_PER_BLOCK;
                 printf("kernelIntersectLevel: %d, %d, %d, %d\n", totalCount, numBlocks, levelCounts[level], SAMPLES_PER_PIXEL * image->height * image->width); 
 
-                if(levelCounts[level] > RAYS_PER_BLOCK) {
-                    printf("Assertion failed levelCounts[%d] < RAYS_PER_BLOCK ", level);
-                    exit(1);
-                }
+                //if(levelCounts[level] > RAYS_PER_BLOCK) {
+                //    printf("Assertion failed levelCounts[%d] < RAYS_PER_BLOCK ", level);
+                //    exit(1);
+                //}
 
                 kernelScanCounts<<<1,RAYS_PER_BLOCK>>>(level, levelCounts[level]);
 
@@ -2033,10 +2127,11 @@ namespace cutracer {
 
             lapTimer(&start, &end, "ClearIntersections()");
 
-            printf("Reset counts: %d\n", a);
-            kernelResetCounts<<<1, a>>>();
+            //printf("Reset counts: %d\n", a);
+            //kernelResetCounts<<<1, a>>>();
 
-            cudaDeviceSynchronize();
+            //cudaDeviceSynchronize();
+            resetCounts();
 
             lapTimer(&start, &end, "ResetCounts()");
 
@@ -2105,6 +2200,11 @@ namespace cutracer {
             processDirectLightBounce(1);
             lapTimer(&start, &end, "Direct Light Bounce 1");
 
+            //processSceneBounce(2);
+            //lapTimer(&start, &end, "Scene Bounce 2");
+
+            //processDirectLightBounce(2);
+            //lapTimer(&start, &end, "Direct Light Bounce 2");
 
             kernelUpdateSSImage<<<intersectionGridDim, intersectionBlockDim>>>();
 
