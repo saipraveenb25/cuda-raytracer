@@ -58,19 +58,21 @@
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 12
-#define SAMPLES_PER_PIXEL 16
+#define SAMPLES_PER_PIXEL 1
 #define TOTAL_SAMPLES_PER_PIXEL 64
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
-#define MAX_INTERSECTIONS 10
+#define MAX_INTERSECTIONS 16
 #define MAX_NODES_PER_LEVEL 4096
 #define MAX_NODE_BLOCKS 32
-#define IMAGE_SIZE 256
+#define IMAGE_SIZE 1024
 
 #undef DEBUG_RAYS
 #undef DEBUG_SPECIFIC_RAY
-#define BOUNDS_CHECK
+#undef BOUNDS_CHECK
 #define RAY_DEBUG_INDEX 2120
+#define RENDER_ACCUMULATE
+
 
 namespace cutracer {
 struct CuRay {
@@ -202,6 +204,8 @@ private:
     Vector3D c_left;
     
     size_t queueSize;
+    int imageSamples;
+    bool randomSeedSetup;
 public:
 
     CudaRenderer();
@@ -224,6 +228,10 @@ public:
     void render();
     
     void renderFrame();
+
+    void renderAccumulate();
+    
+    void renderMultiFrame();
 
     void shadePixel(
         int circleIndex,

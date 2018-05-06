@@ -544,7 +544,7 @@ namespace cutracer {
 
         // Compute a random sample. Hemispherical Random Sample.
 
-        float3 n = normalize(its->n);
+        float3 n = its->n;
 
         float3 guide = (n.y < 1e-4) ? make_float3(0, 1, 0) : make_float3(1, 0, 0);
         float3 dpdu = normalize(cross(guide, n)); 
@@ -553,9 +553,9 @@ namespace cutracer {
         int bsdfID = its->bsdf;
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[bsdfID];
         
-        //CuRay _r;
+        CuRay _r;
         // BSDF-independent parameter assignments.
-        /*_r.maxT = INFINITY;
+        _r.maxT = INFINITY;
         _r.sid = its->sid;
         _r.id = its->id;
         _r.valid = true;
@@ -570,9 +570,9 @@ namespace cutracer {
         _r.o = its->pt + its->n * 1e-3;
 
         _r.pathtype = its->pathtype;
-        _r.depth = its->depth;*/
+        _r.depth = its->depth;
         
-        r->maxT = INFINITY;
+        /*r->maxT = INFINITY;
         r->sid = its->sid;
         r->id = its->id;
         r->valid = true;
@@ -587,7 +587,8 @@ namespace cutracer {
         r->o = its->pt + its->n * 1e-3;
 
         r->pathtype = its->pathtype;
-        r->depth = its->depth;
+        r->depth = its->depth;*/
+
         // BSDF specifics;
         if(bsdf->fn == 0) {
             // Diffuse BSDF.
@@ -608,10 +609,10 @@ namespace cutracer {
             float dY = n.y * sampleZ + sampleX * dpdu.y + sampleY * dpdv.y;
             float dZ = n.z * sampleZ + sampleX * dpdu.z + sampleY * dpdv.z;
 
-            float3 d = normalize(make_float3(dX, dY, dZ));
+            float3 d = make_float3(dX, dY, dZ);
 
-            r->d = d;
-            r->importance = its->importance * abs(dot(r->d, its->n)) * bsdf->albedo * 2; // TODO: Compute with BSDF.
+            _r.d = d;
+            _r.importance = its->importance * abs(dot(_r.d, its->n)) * bsdf->albedo * 2; // TODO: Compute with BSDF.
 
         } else if(bsdf->fn == 1){
 
@@ -623,12 +624,12 @@ namespace cutracer {
             float dY = n.y * wo.z + wo.x * dpdu.y + wo.y * dpdv.y;
             float dZ = n.z * wo.z + wo.x * dpdu.z + wo.y * dpdv.z;
 
-            r->d = normalize(make_float3(dX, dY, dZ));
+            _r.d = make_float3(dX, dY, dZ);
             //r->d = make_float3(1.0, 0, 0);
-            r->importance = its->importance * BSDF_SPECULAR_MULTIPLIER; // Specular importance sample.
+            _r.importance = its->importance * bsdf->albedo * BSDF_SPECULAR_MULTIPLIER; // Specular importance sample.
         }
 
-        //*r = _r;
+        *r = _r;
         //if(raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id == 530578 && (target != (uint64_t)-1) && (subindex < numRays)){ 530578
         
         #ifdef DEBUG_RAY
@@ -1883,6 +1884,18 @@ namespace cutracer {
 
                   cudaMemcpyToSymbol(cuConstColorRamp, lookupTable, sizeof(float) * 3 * COLOR_MAP_SIZE);*/
                 printf("Finished allocation and copy\n");
+                
+                double start, end;
+                startTimer(&start);
+                
+                int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
+                dim3 intersectionBlockDim(1024, 1);
+                dim3 intersectionGridDim(iidBlocksPerNode, 1);
+
+                kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>(); 
+                cudaDeviceSynchronize();
+
+                lapTimer(&start, &end, "SetupRandomSeeds()");
             }
 
             // allocOutputImage --
@@ -2115,7 +2128,7 @@ namespace cutracer {
             *start = *end;
         }
         
-        void CudaRenderer::render() {
+        void CudaRenderer::renderMultiFrame() {
             // Render samples per pixel.
             int frameCount = TOTAL_SAMPLES_PER_PIXEL / SAMPLES_PER_PIXEL;
             int samples = 0;
@@ -2124,18 +2137,15 @@ namespace cutracer {
             dim3 imageBlockDim(1024, 1);
             dim3 imageGridDim(imageBlocksPerNode, 1);
             
-            int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
-            dim3 intersectionBlockDim(1024, 1);
-            dim3 intersectionGridDim(iidBlocksPerNode, 1);
             
             double start,end;
             startTimer(&start);
             
-            kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>(); 
+            //kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>(); 
 
-            cudaDeviceSynchronize();
+            //cudaDeviceSynchronize();
 
-            lapTimer(&start, &end, "SetupRandomSeeds()");
+            //lapTimer(&start, &end, "SetupRandomSeeds()");
             
             //cudaDeviceSynchronize();
         
@@ -2148,6 +2158,48 @@ namespace cutracer {
             }
             
         }
+        
+        void CudaRenderer::render() {
+           #ifdef RENDER_ACCUMULATE
+           renderAccumulate();
+           #else
+           renderMultiFrame();
+           #endif
+        }
+
+        void CudaRenderer::renderAccumulate() {
+            // Render samples per pixel.
+            //int frameCount = TOTAL_SAMPLES_PER_PIXEL / SAMPLES_PER_PIXEL;
+            //int samples = 0;
+            
+            int imageBlocksPerNode = (image->width * image->height) / 1024;
+            dim3 imageBlockDim(1024, 1);
+            dim3 imageGridDim(imageBlocksPerNode, 1);
+            
+            int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
+            dim3 intersectionBlockDim(1024, 1);
+            dim3 intersectionGridDim(iidBlocksPerNode, 1);
+            
+            double start,end;
+            startTimer(&start);
+            
+            //if(!randomSeedSetup) {
+            //    randomSeedSetup = true;
+            //} 
+            //cudaDeviceSynchronize();
+        
+            //for(int i = 0; i < frameCount; i++) {
+            renderFrame();
+            lapTimer(&start, &end, "Frame");
+
+            kernelAccumulate<<<imageGridDim, imageBlockDim>>>(this->imageSamples, SAMPLES_PER_PIXEL);
+            this->imageSamples += SAMPLES_PER_PIXEL;
+            //}
+
+            printf("-------------------SAMPLES: %d\n", this->imageSamples);
+            
+        }
+
         void CudaRenderer::renderFrame() {
 
             //printf("Started rendering %d\n", batchSize);fflush(stdout);
@@ -2214,7 +2266,8 @@ namespace cutracer {
 
             processDirectLightBounce(2);
             lapTimer(&start, &end, "Direct Light Bounce 2");
-            //processSceneBounce(2);
+            
+            //processSceneBounce(3);
             //lapTimer(&start, &end, "Scene Bounce 2");
 
             //processDirectLightBounce(2);
