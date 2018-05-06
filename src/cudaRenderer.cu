@@ -462,9 +462,10 @@ namespace cutracer {
         }
     }
 
-    __global__ void kernelClearIntersections( ) {
+    __global__ void kernelClearIntersections( bool first ) {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
-        for(int i = 0; i < MAX_INTERSECTIONS; i++) {
+        int count = (!first) ? cuConstRendererParams.intersectionTokens[iid] : MAX_INTERSECTIONS;
+        for(int i = 0; i < count; i++) {
             #ifdef DEBUG_SPECIFIC_RAY
             if(iid == RAY_DEBUG_INDEX) {
                 printf("CLEAR INTERSECTION: ID: %d, Clearing=>%d\n", iid, iid * MAX_INTERSECTIONS + i);
@@ -486,31 +487,31 @@ namespace cutracer {
     //    cuConstRendererParams.intersectionTokens[iid] = 0; 
     //}
 
-    __global__ void kernelMergeIntersections( ) {
+    __global__ void kernelMergeIntersections() {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
 
         float t = INFINITY;
-        CuIntersection best;
-        for(int i = 0; i < MAX_INTERSECTIONS; i++) {
+        CuIntersection *best;
+        int count = cuConstRendererParams.intersectionTokens[iid];
+        for(int i = 0; i < count; i++) {
             CuIntersection *its = &cuConstRendererParams.multiIntersections[iid * MAX_INTERSECTIONS + i];
             //if(!its->valid) continue;
             if( its->valid && its->sort_t < t ) {
                 t = its->sort_t;
-                best = *its;
+                best = its;
                 //printf("VALID ITS: %d %f\n", iid, its->t);
+
                 #ifdef DEBUG_SPECIFIC_RAY
-                if( iid == RAY_DEBUG_INDEX) {
+                if( iid == RAY_DEBUG_INDEX ) {
                     printf("MERGE INTERSECTION @ [%d] (%d) %f %f : %f %f %f (%f %f %f) T:%f SortT: %f %d\n", iid * MAX_INTERSECTIONS + i, its->id, its->ss.x, its->ss.y, its->light.x, its->light.y, its->light.z, its->pt.x, its->pt.y, its->pt.z, its->t, its->sort_t, its->pathtype);
                 }
                 #endif
             }
         
         }
-        
-        CuIntersection *its = &best;
-        
+         
         if(t != INFINITY)
-            cuConstRendererParams.intersections[iid] = best;
+            cuConstRendererParams.intersections[iid] = *best;
     }
 
 #define BSDF_DIFFUSE_MULTIPLIER 0.3183
@@ -551,8 +552,26 @@ namespace cutracer {
 
         int bsdfID = its->bsdf;
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[bsdfID];
-
+        
+        //CuRay _r;
         // BSDF-independent parameter assignments.
+        /*_r.maxT = INFINITY;
+        _r.sid = its->sid;
+        _r.id = its->id;
+        _r.valid = true;
+        _r.lightray = false;
+        _r.ss = its->ss;
+        //r->sid = its->sid;
+        _r.lightImportance = make_float3(0, 0, 0); // Not a direct lighting estimate.
+        _r.light = its->light; // No light accumulation at this step.
+
+        // For standard BSDFs this is fine.
+        // For BSSRDFs, move this into the BSDF-specific loops.
+        _r.o = its->pt + its->n * 1e-3;
+
+        _r.pathtype = its->pathtype;
+        _r.depth = its->depth;*/
+        
         r->maxT = INFINITY;
         r->sid = its->sid;
         r->id = its->id;
@@ -577,6 +596,9 @@ namespace cutracer {
             float sampleX = sample.x;
             float sampleY = sample.y;
             float sampleZ = (sample.z < 0) ? -sample.z : sample.z;
+            //float sampleX = 0.0;
+            //float sampleY = 0.0;
+            //float sampleZ = 1.0;
 
             //float sampleX = 0.2;
             //float sampleY = 0.2;
@@ -594,7 +616,7 @@ namespace cutracer {
         } else if(bsdf->fn == 1){
 
             // Mirror BSDF.
-            float3 wi = normalize(its->wi);
+            float3 wi = its->wi;
             float3 wo = make_float3(-wi.x, -wi.y, wi.z); // Reflected ray.
 
             float dX = n.x * wo.z + wo.x * dpdu.x + wo.y * dpdv.x;
@@ -605,6 +627,8 @@ namespace cutracer {
             //r->d = make_float3(1.0, 0, 0);
             r->importance = its->importance * BSDF_SPECULAR_MULTIPLIER; // Specular importance sample.
         }
+
+        //*r = _r;
         //if(raylist[_c_qid[i * RAYS_PER_BLOCK + subindex]].id == 530578 && (target != (uint64_t)-1) && (subindex < numRays)){ 530578
         
         #ifdef DEBUG_RAY
@@ -1890,14 +1914,14 @@ namespace cutracer {
                 printf("Done cleaning\n");
             }
 
-            void CudaRenderer::clearIntersections() {
+            void CudaRenderer::clearIntersections( bool first ) {
                 int numRays = image->height * image->width * SAMPLES_PER_PIXEL;
                 int threadCount = 1024;
 
                 dim3 blockDim(threadCount, 1);
                 dim3 gridDim(numRays / threadCount, 1);
 
-                kernelClearIntersections<<<gridDim, blockDim>>>();
+                kernelClearIntersections<<<gridDim, blockDim>>>( first );
             }
 
             void CudaRenderer::resetCounts() {
@@ -1921,15 +1945,26 @@ namespace cutracer {
             
             }
 
-            void CudaRenderer::resetRayState() {
+            void CudaRenderer::resetRayState( bool first ) {
 
-                clearIntersections();
+                double start,end;
+                startTimer(&start);
+                
+                clearIntersections( false );
+
+                cudaDeviceSynchronize();
+                
+                lapTimer(&start, &end, "Reset Intersections");
                 
                 resetCounts();
 
-                kernelScanCounts<<<1,RAYS_PER_BLOCK>>>(0, levelCounts[0]);
+                lapTimer(&start, &end, "Reset Counts");
 
+                kernelScanCounts<<<1,RAYS_PER_BLOCK>>>(0, levelCounts[0]);
+                
                 cudaDeviceSynchronize();
+
+                lapTimer(&start, &end, "Scan Counts 0");
 
             }
 
@@ -1993,7 +2028,7 @@ namespace cutracer {
 
             lapTimer(&start, &end, "Scene Bounce Generation");
 
-            resetRayState();
+            resetRayState(false);
 
             cudaDeviceSynchronize();
 
@@ -2054,7 +2089,7 @@ namespace cutracer {
 
             lapTimer(&start, &end, "Direct Light Ray Generation");
 
-            resetRayState();
+            resetRayState(false);
 
             cudaDeviceSynchronize();
             
@@ -2155,7 +2190,7 @@ namespace cutracer {
 
             lapTimer(&start, &end, "PrimaryRays()");
             
-            resetRayState();
+            resetRayState(true);
 
             cudaDeviceSynchronize();
             

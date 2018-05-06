@@ -8,24 +8,34 @@
 #define seed 15618
 
 
-__device__ float3 sphericalSample(curandState *my_curandstate){
+__device__ inline float3 sphericalSample(curandState *my_curandstate){
 
 	//int idx = threadIdx.x + blockDim.x*blockIdx.x;
 	float rand1 = curand_uniform( my_curandstate );
 	float rand2 = curand_uniform( my_curandstate );
 	float phi = (2 * PI * rand1);
-	float theta = acos((2 * rand2) - 1);
-	float3 ray = make_float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+	float theta = acosf((2 * rand2) - 1);
+
+    float stheta;
+    float ctheta;
+    float sphi;
+    float cphi;
+    __sincosf( theta, &stheta, &ctheta );
+    __sincosf( phi, &sphi, &cphi );
+
+	float3 ray = make_float3(stheta * cphi, stheta * sphi, ctheta);
+    
+    //float3 ray = make_float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
     return ray;
 }
 
-__device__ float2 squareSample(curandState *my_curandstate) {
+__device__ inline float2 squareSample(curandState *my_curandstate) {
 	float rand1 = curand_uniform( my_curandstate );
 	float rand2 = curand_uniform( my_curandstate );
     return make_float2(rand1, rand2);
 }
 
-__device__ float linearSample(curandState *my_curandstate) {
+__device__ inline float linearSample(curandState *my_curandstate) {
    return curand_uniform( my_curandstate ); 
 }
 

@@ -4,19 +4,19 @@
 # compile C with /usr/bin/cc
 # compile CUDA with /usr/bin/nvcc
 # compile CXX with /usr/bin/c++
-C_FLAGS = -g  
+C_FLAGS =  
 
 C_DEFINES = 
 
 C_INCLUDES = -I/home/sassy/cs618/project/cudascotty/CMU462/include -I/usr/include/freetype2 
 
-CUDA_FLAGS = -std=c++11 --gpu-architecture=compute_60 -g  
+CUDA_FLAGS = -std=c++11 --gpu-architecture=compute_60  
 
 CUDA_DEFINES = 
 
 CUDA_INCLUDES = -I/home/sassy/cs618/project/cudascotty/CMU462/include -I/usr/include/freetype2 
 
-CXX_FLAGS =  -std=gnu++11 -m64 -O3 -fopenmp -g  
+CXX_FLAGS =  -std=gnu++11 -m64 -O3 -fopenmp  
 
 CXX_DEFINES = 
 

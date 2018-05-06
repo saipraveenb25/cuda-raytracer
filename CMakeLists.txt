@@ -66,13 +66,15 @@ endif(APPLE)
 ##################
 set(LINUX UNIX AND NOT APPLE)
 if(LINUX)
+    #set(CMAKE_C_COMPILER /usr/bin/gcc-7)
+    #set(CMAKE_CXX_COMPILER /usr/bin/g++-7)
 
   # GCC configuration
   if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 
     set(GCC_CXX_FLAGS "-std=gnu++11 -m64")
     set(CMAKE_CUDA_FLAGS "-std=c++11 --gpu-architecture=compute_60")
-    
+
     # X11 Dependencies
     if(NOT BUILD_LIBCMU462)
       set(GCC_CXX_FLAGS "${GCC_CXX_FLAGS} -lXi")
@@ -105,7 +107,7 @@ if(LINUX)
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   
       set(CLANG_CXX_FLAGS "-std=c++11 -m64")
-  
+        
       if(BUILD_DEBUG)
         set(CMAKE_BUILD_TYPE Debug)
       else(BUILD_DEBUG)
