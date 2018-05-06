@@ -377,9 +377,10 @@ namespace cutracer {
         int iid = blockIdx.x * blockDim.x + threadIdx.x;
 
         CuIntersection *its = &cuConstRendererParams.intersections[iid];
-
+        
 
         CuEmitter *e = &cuConstRendererParams.emitters[0];
+        //__shared__ CuEmitter e;
 
 
         CuRay *r = &cuConstRendererParams.queues1[iid];
@@ -393,6 +394,9 @@ namespace cutracer {
             r->lightray = false;
             return;
         }
+        
+        CuRay _r;
+        CuIntersection _its = *its;
 
         curandState *rand = &cuConstRendererParams.randomStates[iid];
         float2 sample = squareSample(rand);
@@ -402,40 +406,40 @@ namespace cutracer {
 
 
         float3 lpt = e->position + sampleX * e->dim_x + sampleY * e->dim_y;
-        float3 d =  lpt - its->pt;
+        float3 d =  lpt - _its.pt;
         float cosTheta = dot(d, e->direction);
         float sqDist = dot(d,d);
         float dist = sqrt(sqDist);
-        r->d = d / dist;
-        r->o = its->pt;
+        _r.d = d / dist;
+        _r.o = _its.pt;
         float distToLight = dist;
         float pdf = sqDist / ((e->area) * abs(cosTheta));
-        float fpdf = abs(dot(its->n, r->d))/ pdf;
+        float fpdf = abs(dot(_its.n, _r.d))/ pdf;
 
 
-        CuBSDF *bsdf = &cuConstRendererParams.bsdfs[its->bsdf];
+        CuBSDF *bsdf = &cuConstRendererParams.bsdfs[_its.bsdf];
 
         if(bsdf->fn == 0) {
-            r->lightImportance = its->importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e->radiance;
+            _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e->radiance;
         } else {
-            r->lightImportance = make_float3(0.0f);
+            _r.lightImportance = make_float3(0.0f);
         }
 
-        r->maxT = distToLight;
-        r->importance = its->importance;
-        r->sid = its->sid;
-        r->light = its->light;
-        r->id = its->id;
+        _r.maxT = distToLight;
+        _r.importance = _its.importance;
+        _r.sid = _its.sid;
+        _r.light = _its.light;
+        _r.id = _its.id;
 
         // copied from its so that ray can easily duplicate value.
-        r->n = its->n;
-        r->wi = its->wi;
-        r->t = its->t;
-        r->valid = true;
-        r->lightray = true;
-        r->bsdf = its->bsdf;
-        r->pathtype = its->pathtype;
-        r->depth = its->depth;
+        _r.n = _its.n;
+        _r.wi = _its.wi;
+        _r.t = _its.t;
+        _r.valid = true;
+        _r.lightray = true;
+        _r.bsdf = _its.bsdf;
+        _r.pathtype = _its.pathtype;
+        _r.depth = _its.depth;
         /*if(r->id > 30000 && r->id < 30200 && its->valid) { 530578
           printf("INTERSECTION\n");
           printf("d: %f %f %f\n", r->d.x, r->d.y, r->d.z);
@@ -449,6 +453,9 @@ namespace cutracer {
         printf("ID: %d SS: %f %f o: %f %f %f lpt: %f %f %f pt: %f %f %f t: %f d: %f %f %f its n: %f %f %f r->d: %f %f %f light: %f %f %f NEW: %d\n", r->id, r->ss.x, r->ss.y, r->o.x, r->o.y, r->o.z, lpt.x, lpt.y, lpt.z, its->pt.x, its->pt.y, its->pt.z, its->t, r->d.x, r->d.y, r->d.z, its->n.x, its->n.y, its->n.z, r->d.x, r->d.y, r->d.z, r->light.x, r->light.y, r->light.z, its->is_new);
         //printf("its n: %f %f %f\n", its->n.x, its->n.y, its->n.z);
         }*/
+
+        *r = _r;
+
         #ifdef DEBUG_SPECIFIC_RAY
         if(r->id > 500000 && r->id < 520000 && its->valid && r->pathtype == 2 && r->depth == 2) 
             printf("ID: %d SS: %f %f o: %f %f %f lpt: %f %f %f pt: %f %f %f t: %f d: %f %f %f its n: %f %f %f r->d: %f %f %f light: %f %f %f NEW: %d\n", r->id, r->ss.x, r->ss.y, r->o.x, r->o.y, r->o.z, lpt.x, lpt.y, lpt.z, its->pt.x, its->pt.y, its->pt.z, its->t, r->d.x, r->d.y, r->d.z, its->n.x, its->n.y, its->n.z, r->d.x, r->d.y, r->d.z, r->light.x, r->light.y, r->light.z, its->is_new);
