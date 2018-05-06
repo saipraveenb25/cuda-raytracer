@@ -1366,7 +1366,7 @@ namespace cutracer {
                 printf("Copying image data from device\n");
 
                 cudaMemcpy(image->data,
-                        deviceiFinalImageData,
+                        deviceFinalImageData,
                         sizeof(float) * 4 * image->width * image->height,
                         cudaMemcpyDeviceToHost);
 
@@ -2089,8 +2089,25 @@ namespace cutracer {
             dim3 imageBlockDim(1024, 1);
             dim3 imageGridDim(imageBlocksPerNode, 1);
             
+            int iidBlocksPerNode = (image->width * image->height * SAMPLES_PER_PIXEL) / 1024;
+            dim3 intersectionBlockDim(1024, 1);
+            dim3 intersectionGridDim(iidBlocksPerNode, 1);
+            
+            double start,end;
+            startTimer(&start);
+            
+            kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>(); 
+
+            cudaDeviceSynchronize();
+
+            lapTimer(&start, &end, "SetupRandomSeeds()");
+            
+            //cudaDeviceSynchronize();
+        
             for(int i = 0; i < frameCount; i++) {
                 renderFrame();
+                lapTimer(&start, &end, "Frame");
+
                 kernelAccumulate<<<imageGridDim, imageBlockDim>>>(samples, SAMPLES_PER_PIXEL);
                 samples += SAMPLES_PER_PIXEL;
             }
@@ -2131,11 +2148,6 @@ namespace cutracer {
             double start,end;
             startTimer(&start);
 
-            kernelSetupRandomSeeds<<<intersectionGridDim, intersectionBlockDim>>>();       
-
-            cudaDeviceSynchronize();
-
-            lapTimer(&start, &end, "SetupRandomSeeds()");
 
             kernelPrimaryRays<<<primaryRaysGridDim, primaryRaysBlockDim>>>();
 
@@ -2162,6 +2174,11 @@ namespace cutracer {
             processDirectLightBounce(1);
             lapTimer(&start, &end, "Direct Light Bounce 1");
 
+            processSceneBounce(2);
+            lapTimer(&start, &end, "Scene Bounce 2");
+
+            processDirectLightBounce(2);
+            lapTimer(&start, &end, "Direct Light Bounce 2");
             //processSceneBounce(2);
             //lapTimer(&start, &end, "Scene Bounce 2");
 
