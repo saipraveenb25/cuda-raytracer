@@ -1197,7 +1197,6 @@ namespace cutracer {
                     its.sort_t = t;
                     its.pt = (r->o + r->d * t);// + r->n * 1e-4;
                     //its->lightImportance = r->lightImportance;
-                    its.light = r->light;
                     its.importance = r->importance;
 
                     //float3 n = normalize(cross(tri.a - tri.b, tri.b - tri.c));
@@ -1232,6 +1231,7 @@ namespace cutracer {
                     its.id = r->id;
                     its.bsdf = tri.bsdf;
                     CuBSDF *bsdf = &cuConstRendererParams.bsdfs[its.bsdf];
+                    its.light = bsdf->radiance * r->importance + r->light;
                     its.pathtype = r->pathtype * 2 + bsdf->fn;
                     its.depth = r->depth + 1;
                     its.is_new = 1;
@@ -1688,12 +1688,15 @@ namespace cutracer {
                         // Diffuse.
                         auto _ab = reinterpret_cast<DiffuseBSDF*>(_b);
                         b.albedo = make_float3(_ab->albedo.r, _ab->albedo.g, _ab->albedo.b);
+                        
+                        b.radiance = make_float3(_ab->get_emission().r, _ab->get_emission().g, _ab->get_emission().b);
                         b.fn = 0;
                         b.nu = 0;
                     } else {
                         // Mirror.
                         auto _ab = reinterpret_cast<MirrorBSDF*>(_b);
                         b.albedo = make_float3(_ab->reflectance.r, _ab->reflectance.g, _ab->reflectance.b);
+                        b.radiance = make_float3(0, 0, 0);
                         b.fn = 1;
                         b.nu = 0;
                     }
@@ -2501,14 +2504,14 @@ namespace cutracer {
             processDirectLightBounce(12, 0.5);
             lapTimer(&start, &end, "SCENE Direct Light Bounce 1-2");
 
-            //processSceneBounce(2);
-            //lapTimer(&start, &end, "Scene Bounce 2");
+            processSceneBounce(2);
+            lapTimer(&start, &end, "Scene Bounce 2");
 
-            //processDirectLightBounce(21);
-            //lapTimer(&start, &end, "Direct Light Bounce 2-1");
+            processDirectLightBounce(21, 0.5);
+            lapTimer(&start, &end, "Direct Light Bounce 2-1");
 
-            //processDirectLightBounce(22);
-            //lapTimer(&start, &end, "Direct Light Bounce 2-2");
+            processDirectLightBounce(22, 0.5);
+            lapTimer(&start, &end, "Direct Light Bounce 2-2");
 
             //processSceneBounce(3);
             //lapTimer(&start, &end, "Scene Bounce 2");

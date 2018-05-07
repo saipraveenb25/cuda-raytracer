@@ -64,7 +64,7 @@
 #define MAX_INTERSECTIONS 16
 #define MAX_NODES_PER_LEVEL 4096
 #define MAX_NODE_BLOCKS 32
-#define POST_PROCESS_THRESHOLD 128
+#define POST_PROCESS_THRESHOLD 32
 
 #define IMAGE_SIZE 1024
 #define SAMPLES_PER_PIXEL 1
@@ -74,7 +74,7 @@
 #undef DEBUG_SPECIFIC_RAY
 #undef BOUNDS_CHECK
 #define RAY_DEBUG_INDEX 2120
-#undef RENDER_ACCUMULATE
+#define RENDER_ACCUMULATE
 
 
 namespace cutracer {
@@ -130,6 +130,7 @@ struct CuEmitter {
 struct CuBSDF{
     int fn; // 0 - diffuse, 1 - specular.
     float3 albedo;  // For diffuse.
+    float3 radiance; // For Emitters.
     float nu;       // For specular.
 };
 
