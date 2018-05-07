@@ -58,15 +58,15 @@
 
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
-#define MAX_LEVELS 12
-#define SAMPLES_PER_PIXEL 4
+#define MAX_LEVELS 16
+#define SAMPLES_PER_PIXEL 16
 #define TOTAL_SAMPLES_PER_PIXEL 64
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 16
 #define MAX_NODES_PER_LEVEL 4096
 #define MAX_NODE_BLOCKS 32
-#define IMAGE_SIZE 512
+#define IMAGE_SIZE 256
 
 #undef DEBUG_RAYS
 #undef DEBUG_SPECIFIC_RAY
@@ -198,16 +198,16 @@ private:
     int* levelIndices;
     std::vector<int> levelCounts;
     
-    // Camera data.
-    Vector3D c_origin;
-    Vector3D c_lookAt;
-    Vector3D c_up;
-    Vector3D c_left;
     
     size_t queueSize;
     int imageSamples;
     bool randomSeedSetup;
 public:
+    // Camera data.
+    Vector3D c_origin;
+    Vector3D c_lookAt;
+    Vector3D c_up;
+    Vector3D c_left;
 
     CudaRenderer();
     virtual ~CudaRenderer();
@@ -253,6 +253,8 @@ public:
     void resetCounts();
     
     void rayIntersect(); 
+    
+    void setViewpoint(Vector3D origin, Vector3D lookAt);
 
     void startTimer(double* start);
     void lapTimer(double* start, double* end, std::string info);
