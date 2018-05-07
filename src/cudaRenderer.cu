@@ -92,6 +92,7 @@ namespace cutracer {
         float4* ssImageData; // Super sampled image data.
         float4* imageData; // Reconstructed image frame.
         float4* finalImageData; // Accumulated image.
+        float4* postProcessImageData; // Accumulated image.
         int sampleCount;
 
         // Ray queues: SxR (S=Number of subtrees, R=Max number of rays per queue) 
@@ -738,6 +739,101 @@ namespace cutracer {
         cuConstRendererParams.finalImageData[idx] = make_float4(0.0, 0.0, 0.0, 1.0);
     }
 
+#define BLUR_KERNEL 1
+#define BLUR_KERNEL_FULL 3
+#define BLUR_MEDIAN_INDEX 4
+#define BLUR_VARIANCE 1
+#define BLUR_MULTIPLIER 0.19947
+//#define MEDIAN_HEAP_SIZE BLUR_KERNEL * BLUR_KERNEL - 1
+    /*__global__ void kernelGaussianBlur() {
+        int x = blockIdx.x * blockDim.x + threadIdx.x;
+        int y = blockIdx.y * blockDim.y + threadIdx.y;
+        
+        int _idx = x * cuConstRendererParams.imageHeight + y; 
+        
+        float4 color = make_float4(0);
+        for(int _x = x - BLUR_KERNEL; _x < x + BLUR_KERNEL; _x++) {
+            for(int _y = y - BLUR_KERNEL; _y < y + BLUR_KERNEL; _y++) {
+                int _cidx = _x * cuConstRendererParams.imageHeight + _y;
+                float2 delta = make_float2(_x - x, _y - y);
+                color += cuConstRendererParams.finalImageData[_cidx] * (expf(-length(delta)) * BLUR_MULTIPLIER);
+            }
+        }
+
+        cuConstRendererParams.postProcessImageData[_idx] = color;
+    }*/
+
+    __global__ void kernelMedianFilter() {
+        
+        int x = blockIdx.x * blockDim.x + threadIdx.x;
+        int y = blockIdx.y * blockDim.y + threadIdx.y;
+        
+        //int size = BLUR_KERNEL * BLUR_KERNEL - 1;
+        
+        int _idx = x * cuConstRendererParams.imageHeight + y; 
+
+        float4 colors[BLUR_KERNEL_FULL * BLUR_KERNEL_FULL];
+        
+        int k = 0;
+        for(int _x = x - BLUR_KERNEL; _x <= x + BLUR_KERNEL; _x++) {
+            for(int _y = y - BLUR_KERNEL; _y <= y + BLUR_KERNEL; _y++) {
+                
+                if(_x < 0 || _x >= cuConstRendererParams.imageWidth || _y < 0 || _y >= cuConstRendererParams.imageHeight) {
+                    colors[k++] = make_float4(1.0);
+                    //if(k > BLUR_KERNEL_FULL * BLUR_KERNEL_FULL) {
+                    //    printf("k exceeded.\n");
+                    //    asm("trap;");
+                    //}
+                    continue;
+                }
+                
+
+                int _cidx = _x * cuConstRendererParams.imageHeight + _y;
+                //float2 delta = make_float2(_x - x, _y - y);
+                
+                //color += cuConstRendererParams.finalImageData[_cidx] * (expf(-length(delta)) * BLUR_MULTIPLIER);
+                colors[k++] = cuConstRendererParams.finalImageData[_cidx];
+            }
+        }
+
+        
+        int limit = BLUR_MEDIAN_INDEX;//(BLUR_KERNEL_FULL * BLUR_KERNEL_FULL) / 2;
+        
+        float4 color = make_float4(1.0, 1.0, 1.0, 1.0);
+                    //printf("k mismatch\n");
+                    //asm("trap;");
+        for(int i = 0; i < limit; i++) {
+            int imaxr = 0, imaxg = 0, imaxb = 0;
+            float maxr = 0.0f, maxg = 0.0f, maxb = 0.0f;
+            for(int j = 0; j < BLUR_KERNEL_FULL * BLUR_KERNEL_FULL; j++) {
+                if(colors[j].x >= maxr) {
+                    maxr = colors[j].x;
+                    imaxr = j;
+                }
+                
+                if(colors[j].y >= maxg) {
+                    maxg = colors[j].y;
+                    imaxg = j;
+                }
+                
+                if(colors[j].z >= maxb) {
+                    maxb = colors[j].z;
+                    imaxb = j;
+                }
+            }
+
+            if(i < (limit - 1)) {
+                colors[imaxr].x = 0.0f;
+                colors[imaxg].y = 0.0f;
+                colors[imaxb].z = 0.0f;
+            } else {
+                color = make_float4(colors[imaxr].x, colors[imaxg].y, colors[imaxb].z, 1.0); 
+            }
+        }
+
+        cuConstRendererParams.postProcessImageData[_idx] = color;
+    }
+
     // Intersection functions
     // Performs ray intersect on a single node.
     __device__ void rayIntersectSingle(int snode, int index, CuRay* inputQueue, CuRay* outputQueue) {
@@ -1186,7 +1282,7 @@ namespace cutracer {
 
 
             }
-
+                
             __global__ void kernelSetupRandomSeeds(){
                 int idx = blockIdx.x * blockDim.x + threadIdx.x;
                 curand_init(seed, idx, 0, &cuConstRendererParams.randomStates[idx]);
@@ -1433,12 +1529,25 @@ namespace cutracer {
                 // before we expose the Image object to the caller
 
                 printf("Copying image data from device\n");
-
-                cudaMemcpy(image->data,
-                        deviceFinalImageData,
+                
+                #ifdef RENDER_ACCUMULATE 
+                if(this->imageSamples < POST_PROCESS_THRESHOLD) {
+                    cudaMemcpy(image->data,
+                        devicePostProcessImageData,
                         sizeof(float) * 4 * image->width * image->height,
                         cudaMemcpyDeviceToHost);
-
+                } else {
+                    cudaMemcpy(image->data,
+                        deviceFinalImageData,
+                        sizeof(float) * 4 * image->width * image->height,
+                        cudaMemcpyDeviceToHost); 
+                }
+                #else
+                    cudaMemcpy(image->data,
+                        deviceFinalImageData,
+                        sizeof(float) * 4 * image->width * image->height,
+                        cudaMemcpyDeviceToHost); 
+                #endif
                 return image;
             }
 
@@ -1842,6 +1951,8 @@ namespace cutracer {
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
                 ok = cudaMalloc(&deviceFinalImageData, sizeof(float) * 4 * image->width * image->height);
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
+                ok = cudaMalloc(&devicePostProcessImageData, sizeof(float) * 4 * image->width * image->height);
+                if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
                 ok = cudaMalloc(&deviceQueueCounts, sizeof(uint) * subtrees.size());
                 if(ok != cudaSuccess) {printf("Couldn't allocate memory\n");exit(1);}
                 ok = cudaMalloc(&deviceMinT, sizeof(float) * numRays);
@@ -1918,6 +2029,7 @@ namespace cutracer {
                 params.ssImageData = (float4*)deviceSSImageData;
                 params.imageData = (float4*)deviceImageData;
                 params.finalImageData = (float4*)deviceFinalImageData;
+                params.postProcessImageData = (float4*)devicePostProcessImageData;
                 params.qCounts = deviceQueueCounts;
                 params.levelIndices = deviceLevelIndices;
                 params.sampleCount = SAMPLES_PER_PIXEL;
@@ -2034,6 +2146,17 @@ namespace cutracer {
 
                 cudaDeviceSynchronize();
 
+            }
+            
+            void CudaRenderer::postProcessImage() {
+
+                dim3 primaryRaysBlockDim(32, 32);
+                dim3 primaryRaysGridDim(image->width >> 5, image->height >> 5);
+
+                //kernelGaussianBlur<<< primaryRaysGridDim, primaryRaysBlockDim >>>();
+                kernelMedianFilter<<< primaryRaysGridDim, primaryRaysBlockDim >>>();
+
+                cudaDeviceSynchronize();
             }
 
             void CudaRenderer::resetRayState( bool first ) {
@@ -2291,8 +2414,15 @@ namespace cutracer {
             //for(int i = 0; i < frameCount; i++) {
             renderFrame();
             lapTimer(&start, &end, "Frame");
-
+            
+            //if(this->imageSamples == 0) {
             kernelAccumulate<<<imageGridDim, imageBlockDim>>>(this->imageSamples, SAMPLES_PER_PIXEL);
+            //} else if {
+            if(this->imageSamples < POST_PROCESS_THRESHOLD) {
+                postProcessImage();
+            }
+            //}
+
             this->imageSamples += SAMPLES_PER_PIXEL;
             //}
 
@@ -2336,8 +2466,9 @@ namespace cutracer {
             //dim3 queueCountsBlockDim(400, 1);
             //dim3 queueCountsGridDim(1, 1);
 
-            double start,end;
+            double start,end, exec_start, exec_end;
             startTimer(&start);
+            startTimer(&exec_start);
 
             kernelPrimaryRays<<<primaryRaysGridDim, primaryRaysBlockDim>>>();
 
@@ -2355,20 +2486,20 @@ namespace cutracer {
 
             lapTimer(&start, &end, "Primary Ray Intersect");
 
-            processDirectLightBounce(0, 1.0);
-            lapTimer(&start, &end, "Direct Light Bounce 0");
+            processDirectLightBounce(0, 0.5);
+            lapTimer(&start, &end, "PRIMARY Direct Light Bounce 0");
 
-            //processDirectLightBounce(1, 0.5);
-            //lapTimer(&start, &end, "Direct Light Bounce 0-1");
+            processDirectLightBounce(1, 0.5);
+            lapTimer(&start, &end, "PRIMARY Direct Light Bounce 0-1");
 
             processSceneBounce(1);
             lapTimer(&start, &end, "Scene Bounce 1");
 
-            processDirectLightBounce(11, 1.0);
-            lapTimer(&start, &end, "Direct Light Bounce 1-1");
+            processDirectLightBounce(11, 0.5);
+            lapTimer(&start, &end, "SCENE Direct Light Bounce 1-1");
 
-            //processDirectLightBounce(12, 0.5);
-            //lapTimer(&start, &end, "Direct Light Bounce 1-2");
+            processDirectLightBounce(12, 0.5);
+            lapTimer(&start, &end, "SCENE Direct Light Bounce 1-2");
 
             //processSceneBounce(2);
             //lapTimer(&start, &end, "Scene Bounce 2");
@@ -2395,7 +2526,7 @@ namespace cutracer {
             cudaDeviceSynchronize();
 
             lapTimer(&start, &end, "Build Image");
-
+            lapTimer(&exec_start, &exec_end, "IMAGE RENDER TIME");
 
         }
 

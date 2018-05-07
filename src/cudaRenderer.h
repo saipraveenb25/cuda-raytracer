@@ -59,20 +59,22 @@
 #define QUEUE_LENGTH_LOG2 18
 #define LEVEL_INDEX_SIZE 4096
 #define MAX_LEVELS 16
-#define SAMPLES_PER_PIXEL 16
-#define TOTAL_SAMPLES_PER_PIXEL 64
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
 #define MAX_INTERSECTIONS 16
 #define MAX_NODES_PER_LEVEL 4096
 #define MAX_NODE_BLOCKS 32
-#define IMAGE_SIZE 256
+#define POST_PROCESS_THRESHOLD 128
+
+#define IMAGE_SIZE 1024
+#define SAMPLES_PER_PIXEL 1
+#define TOTAL_SAMPLES_PER_PIXEL 1
 
 #undef DEBUG_RAYS
 #undef DEBUG_SPECIFIC_RAY
 #undef BOUNDS_CHECK
 #define RAY_DEBUG_INDEX 2120
-#define RENDER_ACCUMULATE
+#undef RENDER_ACCUMULATE
 
 
 namespace cutracer {
@@ -180,6 +182,7 @@ private:
     int* deviceLevelIndices;
     float* deviceImageData;
     float* deviceFinalImageData;
+    float* devicePostProcessImageData;
     float* deviceSSImageData;
     uint* deviceQueueCounts;
     float* deviceMinT;
@@ -255,6 +258,8 @@ public:
     void rayIntersect(); 
     
     void setViewpoint(Vector3D origin, Vector3D lookAt);
+    
+    void postProcessImage();
 
     void startTimer(double* start);
     void lapTimer(double* start, double* end, std::string info);
