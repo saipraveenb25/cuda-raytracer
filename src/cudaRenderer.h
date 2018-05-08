@@ -52,12 +52,15 @@
 #include "bvh.h"
 #include "cycleTimer.h"
 
+// For Tree Width: TREE_WIDTH, bvh.cpp: TREE_BRANCHES, DEPTH
+// For Rays per Block: RAYS_PER_BLOCK RAYS_PER_BLOCK_LOG2, cudaRenderer.cu: SCAN_BLOCK_DIM
+
 #define TREE_WIDTH 4
-#define RAYS_PER_BLOCK 256
-#define RAYS_PER_BLOCK_LOG2 8
+#define RAYS_PER_BLOCK 64
+#define RAYS_PER_BLOCK_LOG2 6
 
 #define QUEUE_LENGTH_LOG2 18
-#define LEVEL_INDEX_SIZE 4096
+#define LEVEL_INDEX_SIZE 6000
 #define MAX_LEVELS 16
 #define MAX_TRIANGLES 32
 #define MAX_T_DISTANCE 10000.0
@@ -66,16 +69,18 @@
 #define MAX_NODE_BLOCKS 32
 #define POST_PROCESS_THRESHOLD 32
 
-#define IMAGE_SIZE 1024
-#define SAMPLES_PER_PIXEL 1
-#define TOTAL_SAMPLES_PER_PIXEL 1
+#define IMAGE_SIZE 512
+#define SAMPLES_PER_PIXEL 2
+#define TOTAL_SAMPLES_PER_PIXEL 512
+
+#define REAL_TIME
 
 #undef DEBUG_RAYS
 #undef DEBUG_SPECIFIC_RAY
 #undef BOUNDS_CHECK
 #define RAY_DEBUG_INDEX 2120
 #define RENDER_ACCUMULATE
-
+#undef CUDA_PROFILING
 
 namespace cutracer {
 struct CuRay {

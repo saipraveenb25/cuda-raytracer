@@ -37,7 +37,7 @@
       <extra>
         <technique profile="CMU462">
           <area>
-            <color sid="color">6 6 6</color>
+            <color sid="color">10 10 10</color>
           </area>
         </technique>
       </extra>
@@ -236,7 +236,7 @@
       <extra>
         <technique profile="CMU462">
           <mirror>
-            <reflectance>0.3 0.3 0.3</reflectance>
+            <reflectance>0.9 0.9 0.9</reflectance>
           </mirror>
         </technique>
       </extra>

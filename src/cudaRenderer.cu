@@ -10,8 +10,9 @@
 //#include "sceneLoader.h"
 //#include "util.h"
 //#include "cycleTimer.h"
+#include <cuda_profiler_api.h>
 
-#define SCAN_BLOCK_DIM 256  // needed by sharedMemExclusiveScan implementation
+#define SCAN_BLOCK_DIM 64  // needed by sharedMemExclusiveScan implementation
 #include "exclusiveScan.cu_inl"
 #include "samplers.cu_inl"
 #include "cuda_util.h"
@@ -429,13 +430,19 @@ namespace cutracer {
 
 
         CuBSDF *bsdf = &cuConstRendererParams.bsdfs[_its.bsdf];
-
-        if(bsdf->fn == 0 && dist > 1e-2 && abs(cosTheta) > 1e-2) {
+        float3 radiance = bsdf->radiance;
+        
+        #ifndef REAL_TIME
+        bool emitter_surface = bsdf->radiance.x != 0 || bsdf->radiance.y != 0 || bsdf->radiance.z != 0;
+        #else
+        bool emitter_surface = false;
+        #endif
+        if(bsdf->fn == 0 && dist > 1e-2 && abs(cosTheta) > 1e-2 && !emitter_surface) {
             _r.lightImportance = _its.importance * bsdf->albedo * make_float3(fpdf, fpdf, fpdf) * e.radiance * BSDF_DIFFUSE_MULTIPLIER * weight;
         } else {
             _r.lightImportance = make_float3(0.0f);
         }
-
+        
         _r.maxT = distToLight;
         _r.importance = _its.importance;
         _r.sid = _its.sid;
@@ -1231,7 +1238,13 @@ namespace cutracer {
                     its.id = r->id;
                     its.bsdf = tri.bsdf;
                     CuBSDF *bsdf = &cuConstRendererParams.bsdfs[its.bsdf];
+                    
+                    #ifndef REAL_TIME
                     its.light = bsdf->radiance * r->importance + r->light;
+                    #else
+                    its.light = r->light;
+                    #endif
+
                     its.pathtype = r->pathtype * 2 + bsdf->fn;
                     its.depth = r->depth + 1;
                     its.is_new = 1;
@@ -1543,11 +1556,16 @@ namespace cutracer {
                         cudaMemcpyDeviceToHost); 
                 }
                 #else
-                    cudaMemcpy(image->data,
+                    /*cudaMemcpy(image->data,
                         deviceFinalImageData,
+                        sizeof(float) * 4 * image->width * image->height,
+                        cudaMemcpyDeviceToHost); */
+                    cudaMemcpy(image->data,
+                        devicePostProcessImageData,
                         sizeof(float) * 4 * image->width * image->height,
                         cudaMemcpyDeviceToHost); 
                 #endif
+                //cudaProfilerStop();
                 return image;
             }
 
@@ -1735,7 +1753,7 @@ namespace cutracer {
                 //std::vector<CuEmitter> emitters;
                 emitters.push_back(e);
 
-
+                
                 auto bvh = new StaticScene::BVHAccel(primitives);
 
                 std::cout << "Primitives loaded: " << primitives.size() << std::endl;
@@ -2089,6 +2107,9 @@ namespace cutracer {
                 cudaDeviceSynchronize();
 
                 lapTimer(&start, &end, "SetupRandomSeeds()");
+                #ifdef CUDA_PROFILING
+                cudaProfilerStart();
+                #endif
             }
 
             // allocOutputImage --
@@ -2381,6 +2402,8 @@ namespace cutracer {
 
                 kernelAccumulate<<<imageGridDim, imageBlockDim>>>(samples, SAMPLES_PER_PIXEL);
                 samples += SAMPLES_PER_PIXEL;
+
+                postProcessImage();
             }
 
         }
@@ -2507,11 +2530,11 @@ namespace cutracer {
             processSceneBounce(2);
             lapTimer(&start, &end, "Scene Bounce 2");
 
-            processDirectLightBounce(21, 0.5);
+            processDirectLightBounce(21, 1.0);
             lapTimer(&start, &end, "Direct Light Bounce 2-1");
 
-            processDirectLightBounce(22, 0.5);
-            lapTimer(&start, &end, "Direct Light Bounce 2-2");
+            //processDirectLightBounce(22, 0.5);
+            //lapTimer(&start, &end, "Direct Light Bounce 2-2");
 
             //processSceneBounce(3);
             //lapTimer(&start, &end, "Scene Bounce 2");
@@ -2527,10 +2550,17 @@ namespace cutracer {
             kernelReconstructImage<<<imageGridDim, imageBlockDim>>>();
 
             cudaDeviceSynchronize();
+            
+            //if(this->imageSamples < POST_PROCESS_THRESHOLD) {
+            //}
 
             lapTimer(&start, &end, "Build Image");
             lapTimer(&exec_start, &exec_end, "IMAGE RENDER TIME");
-
+            
+            #ifdef CUDA_PROFILING
+            cudaProfilerStop();
+            exit(0);
+            #endif
         }
 
         }
